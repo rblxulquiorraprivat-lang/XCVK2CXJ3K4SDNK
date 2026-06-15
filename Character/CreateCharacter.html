@@ -22,6 +22,7 @@
             --border-color: rgba(255, 255, 255, 0.08);
             --color-primary: #6366f1;
             --color-success: #10b981;
+            --color-warning: #f59e0b;
         }
 
         body {
@@ -79,12 +80,12 @@
         /* --- MAIN CREATOR CREATIVE LAYOUT --- */
         .creator-container {
             flex: 1;
-            max-width: 1300px;
+            max-width: 1400px;
             width: 100%;
             margin: 40px auto;
             padding: 0 20px;
             display: grid;
-            grid-template-columns: 1.5fr 1fr;
+            grid-template-columns: 1.6fr 1fr;
             gap: 40px;
         }
 
@@ -114,12 +115,24 @@
             font-size: 0.9rem;
         }
 
-        /* Form Controls & Styling */
-        .form-group {
-            margin-bottom: 24px;
+        .section-subtitle {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--color-primary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin: 25px 0 15px 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .form-group.row {
+        /* Form Controls & Styling */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group.row-2 {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 20px;
@@ -127,7 +140,7 @@
 
         .form-label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             font-weight: 700;
             color: var(--text-muted);
             margin-bottom: 8px;
@@ -139,12 +152,21 @@
             width: 100%;
             background: rgba(0, 0, 0, 0.25);
             border: 1px solid var(--border-color);
-            padding: 14px 18px;
-            border-radius: 14px;
+            padding: 12px 16px;
+            border-radius: 12px;
             color: #fff;
             font-size: 0.95rem;
             outline: none;
             transition: all 0.25s ease;
+        }
+
+        select.form-control {
+            cursor: pointer;
+        }
+
+        select.form-control option {
+            background-color: var(--bg-sidebar);
+            color: #fff;
         }
 
         .form-control:focus {
@@ -154,31 +176,76 @@
         }
 
         textarea.form-control {
-            resize: none;
+            resize: vertical;
+            min-height: 80px;
             line-height: 1.5;
         }
 
-        /* Custom Tags Input UI */
-        .tags-wrapper {
+        /* Dynamic Lists Layout (Tags & Secrets) */
+        .dynamic-list-container {
             background: rgba(0, 0, 0, 0.25);
             border: 1px solid var(--border-color);
-            padding: 8px 12px;
+            padding: 12px;
             border-radius: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .dynamic-input-row {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn-add-dynamic {
+            background: var(--bg-accent);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 0 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-add-dynamic:hover {
+            background: var(--color-primary);
+            border-color: var(--color-primary);
+        }
+
+        .secrets-list-display {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .secret-item {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.2);
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 0.88rem;
+            color: #fde68a;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .secret-item span.remove-btn {
+            cursor: pointer;
+            color: rgba(255,255,255,0.4);
+            font-weight: bold;
+        }
+
+        .secret-item span.remove-btn:hover {
+            color: #ff4a4a;
+        }
+
+        .tags-wrapper {
             display: flex;
             flex-wrap: wrap;
             gap: 8px;
             align-items: center;
-        }
-
-        .tags-wrapper input {
-            flex: 1;
-            background: transparent;
-            border: none;
-            color: #fff;
-            padding: 6px;
-            outline: none;
-            font-size: 0.95rem;
-            min-width: 120px;
         }
 
         .dynamic-tag {
@@ -197,28 +264,10 @@
         .dynamic-tag span {
             cursor: pointer;
             color: rgba(255,255,255,0.4);
-            transition: color 0.2s;
         }
 
         .dynamic-tag span:hover {
             color: #ff4a4a;
-        }
-
-        /* Custom Color Preset Row */
-        .color-picker-container {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .custom-color-input {
-            width: 50px;
-            height: 45px;
-            padding: 0;
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            background: transparent;
-            cursor: pointer;
         }
 
         /* --- PREVIEW PANEL (RIGHT SIDE) --- */
@@ -253,8 +302,10 @@
         }
 
         .live-banner {
-            height: 140px;
-            background: linear-gradient(180deg, rgba(31,35,53,0.3) 0%, var(--bg-sidebar) 100%);
+            height: 160px;
+            background: linear-gradient(180deg, rgba(31,35,53,0.2) 0%, var(--bg-sidebar) 100%);
+            background-size: cover;
+            background-position: center;
             position: relative;
             border-bottom: 1px solid rgba(255,255,255,0.04);
         }
@@ -282,7 +333,12 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 6px;
+            margin-bottom: 4px;
+        }
+
+        .live-name-container {
+            display: flex;
+            flex-direction: column;
         }
 
         .live-name {
@@ -292,6 +348,14 @@
             display: flex;
             align-items: center;
             gap: 8px;
+        }
+
+        .live-story-name {
+            font-size: 0.85rem;
+            color: var(--color-primary);
+            font-weight: 600;
+            margin-top: -2px;
+            margin-bottom: 4px;
         }
 
         .live-indicator {
@@ -315,21 +379,48 @@
         .live-subtitle {
             color: var(--text-muted);
             font-size: 0.9rem;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
         }
 
         .live-description {
             font-size: 0.88rem;
             color: #d1d5db;
             line-height: 1.5;
-            margin-bottom: 20px;
-            min-height: 45px;
+            margin-bottom: 15px;
+            min-height: 40px;
+        }
+
+        /* Preview Details Accordion Grid */
+        .preview-details-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 8px;
+            background: rgba(0,0,0,0.15);
+            padding: 12px;
+            border-radius: 12px;
+            margin-bottom: 15px;
+            font-size: 0.82rem;
+            border: 1px solid rgba(255,255,255,0.03);
+        }
+
+        .preview-detail-item {
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+
+        .preview-detail-item strong {
+            color: #fff;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            display: inline-block;
+            width: 90px;
         }
 
         .live-tags {
             display: flex;
             flex-wrap: wrap;
             gap: 6px;
+            margin-bottom: 10px;
         }
 
         .live-tag-badge {
@@ -340,6 +431,15 @@
             font-size: 0.75rem;
             font-weight: 600;
             border: 1px solid rgba(99, 102, 241, 0.15);
+        }
+
+        .live-secrets-count {
+            font-size: 0.78rem;
+            color: var(--color-warning);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-weight: 600;
         }
 
         /* Large Action Creation Button */
@@ -359,7 +459,7 @@
             box-shadow: 0 4px 20px rgba(99, 102, 241, 0.25);
             transition: all 0.2s ease;
             width: 100%;
-            margin-top: 10px;
+            margin-top: 25px;
         }
 
         .create-submit-btn:hover {
@@ -369,109 +469,185 @@
         }
 
         .create-submit-btn svg {
-            width: 18px;
-            height: 18px;
-            fill: currentColor;
+            width: 18px; height: 18px; fill: currentColor;
         }
     </style>
 </head>
 <body>
 
     <nav class="top-navbar">
-        <a href="index.html" class="back-link">
+        <a href="../index.html" class="back-link">
             <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
             Zurück zum Hub
         </a>
-        <div class="nav-title">Story AI Creator Studio</div>
-        <div style="width: 130px;"></div> </nav>
+        <div class="nav-title">Story AI Database Studio</div>
+        <div style="width: 130px;"></div>
+    </nav>
 
     <div class="creator-container">
         
         <main class="creator-form-panel">
             <div class="panel-heading">
-                <h2>Neuen Charakter erschaffen</h2>
-                <p>Konfiguriere die Identität, Core-Daten und das visuelle Erscheinungsbild deines KI-Charakters.</p>
+                <h2>Neuen Charakter registrieren</h2>
+                <p>Konfiguriere das vollständige relationale Schema für die Charakter-Entität (Perchance Database Match).</p>
             </div>
 
             <form id="characterForm" onsubmit="handleFormSubmit(event)">
                 
-                <div class="form-group row">
+                <div class="section-subtitle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    1. Identitäts- & Systemdaten
+                </div>
+
+                <div class="form-group row-2">
                     <div>
-                        <label class="form-label" for="charName">Charakter Name</label>
-                        <input type="text" id="charName" class="form-control" placeholder="z.B. Konata Izumi" required oninput="updatePreview()">
+                        <label class="form-label" for="charName">Character Name (Main Menu Anzeige)</label>
+                        <input type="text" id="charName" class="form-control" placeholder="z.B. Konata" required oninput="updatePreview()">
                     </div>
                     <div>
-                        <label class="form-label" for="charSubtitle">Rolle / Kurzbeschreibung</label>
-                        <input type="text" id="charSubtitle" class="form-control" placeholder="z.B. Anime Otaku • Fröhlich" required oninput="updatePreview()">
+                        <label class="form-label" for="charStoryName">Story Name (Eigentlicher Name)</label>
+                        <input type="text" id="charStoryName" class="form-control" placeholder="z.B. Konata Izumi" required oninput="updatePreview()">
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="charAvatar">Avatar Bild-URL</label>
-                    <input type="url" id="charAvatar" class="form-control" placeholder="https://images.unsplash.com/..." oninput="updatePreview()">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charDesc">Hintergrundgeschichte & Persönlichkeit (Lore)</label>
-                    <textarea id="charDesc" class="form-control" rows="5" placeholder="Beschreibe das Verhalten, die Marotten und das Wissen des Charakters im Rollenspiel..." oninput="updatePreview()"></textarea>
-                </div>
-
-                <div class="form-group row">
+                <div class="form-group row-2">
                     <div>
-                        <label class="form-label" for="charEngine">KI-Modell Engine</label>
-                        <select id="charEngine" class="form-control" style="background:#000; cursor:pointer;">
-                            <option>StoryAI Ultra v2.5 (Standard)</option>
-                            <option>Roleplay-Claude-Specialist</option>
-                            <option>Llama-3-Fiction-70B</option>
+                        <label class="form-label" for="charVisibility">Sichtbarkeit</label>
+                        <select id="charVisibility" class="form-control" onchange="updatePreview()">
+                            <option value="private">Privat</option>
+                            <option value="public" id="publicOption" style="display: none;">Public (Öffentlich)</option>
                         </select>
                     </div>
                     <div>
-                        <label class="form-label">Theme Akzent-Farbe</label>
-                        <div class="color-picker-container">
-                            <input type="color" id="charColor" class="custom-color-input" value="#6366f1" oninput="updatePreview()">
-                            <span style="font-size:0.85rem; color:var(--text-muted);">Farbe für Profil-Highlights</span>
+                        <label class="form-label" for="charShortDesc">ShortDesc (Kurzbeschreibung)</label>
+                        <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" required oninput="updatePreview()">
+                    </div>
+                </div>
+
+                <div class="section-subtitle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    2. Charakter-Eigenschaften (Core Attributes)
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="charAppearance">Appearance (Das Aussehen)</label>
+                    <textarea id="charAppearance" class="form-control" placeholder="Blaue Haare, Ahoge, kleine Statur, schläfrige Augen..." oninput="updatePreview()"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="charPersonality">Personality (Die Persönlichkeit)</label>
+                    <textarea id="charPersonality" class="form-control" placeholder="Exzentrisch, sarkastisch, freundlich, extrem leidenschaftlich bezüglich Videospielen und Animes..." oninput="updatePreview()"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="charGenerally">Generally (Allgemeines / Andere Infos)</label>
+                    <textarea id="charGenerally" class="form-control" placeholder="Arbeitet in einem Cosplay-Café. Hasst es, für die Schule zu lernen und macht alles in der letzten Nacht..." oninput="updatePreview()"></textarea>
+                </div>
+
+                <div class="section-subtitle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                    3. Visuelle Assets & Kosmetik
+                </div>
+
+                <div class="form-group row-2">
+                    <div>
+                        <label class="form-label" for="charAvatar">Avatar Image URL</label>
+                        <input type="url" id="charAvatar" class="form-control" placeholder="https://images.unsplash.com/..." oninput="updatePreview()">
+                    </div>
+                    <div>
+                        <label class="form-label" for="charCoverUrl">Banner Cover URL</label>
+                        <input type="url" id="charCoverUrl" class="form-control" placeholder="Optionales Hintergrundbild..." oninput="updatePreview()">
+                    </div>
+                </div>
+
+                <div class="form-group row-2">
+                    <div>
+                        <label class="form-label" for="charEngine">AI Logic Engine Template</label>
+                        <select id="charEngine" class="form-control">
+                            <option value="StoryAI-v4-Pro">StoryAI v4 Pro (Recommended)</option>
+                            <option value="StoryAI-v3-Legacy">StoryAI v3 Legacy</option>
+                            <option value="RP-Creative-Specialist">RP Creative Specialist</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" for="charColor">Hex Theme Color Accent</label>
+                        <input type="color" id="charColor" class="form-control" value="#6366f1" oninput="updatePreview()">
+                    </div>
+                </div>
+
+                <div class="section-subtitle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H8.9V6zM18 20H6V10h12v10z"/></svg>
+                    4. Relationale Metadaten (Tags & Secrets)
+                </div>
+
+                <div class="form-group row-2">
+                    <div>
+                        <label class="form-label">Verborgene Geheimnisse (Secrets)</label>
+                        <div class="dynamic-list-container">
+                            <div class="dynamic-input-row">
+                                <input type="text" id="secretInput" class="form-control" placeholder="z.B. Hat heimlich Angst vor Hunden">
+                                <button type="button" class="btn-add-dynamic" onclick="addSecret()">Add</button>
+                            </div>
+                            <div id="secretsListDisplay" class="secrets-list-display"></div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="form-label">Such-Tags / Kategorien</label>
+                        <div class="dynamic-list-container">
+                            <div class="dynamic-input-row">
+                                <input type="text" id="tagInput" class="form-control" placeholder="z.B. Anime">
+                                <button type="button" class="btn-add-dynamic" onclick="addTag()">Add</button>
+                            </div>
+                            <div id="tagsWrapper" class="tags-wrapper"></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label">Tags / Kategorien <span style="text-transform:none; font-weight:normal; color:var(--text-muted);">(Enter zum Hinzufügen)</span></label>
-                    <div class="tags-wrapper" id="tagsWrapper">
-                        <input type="text" id="tagInput" placeholder="Tag eintippen..." onkeydown="handleTagInput(event)">
-                    </div>
-                </div>
-
-                <input type="hidden" id="charMeta" value="User">
-
                 <button type="submit" class="create-submit-btn">
-                    <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17h-2v-2h2v2zm2.07-7.75l-.9.92C13.45 12.9 13 13.5 13 15h-2v-.5c0-1.1.45-2.1 1.17-2.83l1.24-1.26c.37-.36.59-.86.59-1.41 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.76 2.24-5 5-5s5 2.24 5 5c0 1.04-.42 1.99-1.07 2.75z"/></svg>
-                    Charakter-Entität erschaffen
+                    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                    Charakter-Entität lokal initialisieren
                 </button>
             </form>
         </main>
 
         <aside class="creator-preview-panel">
             <div class="preview-sticky-title">
-                <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></svg>
-                Live Hub-Vorschau
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></aside>
+                Echtzeit-Vorschau
             </div>
 
             <div class="live-card" id="previewCard">
-                <div class="live-banner">
+                <div class="live-banner" id="previewBanner">
                     <div class="live-avatar-frame" id="previewAvatar"></div>
                 </div>
+
                 <div class="live-body">
                     <div class="live-title-row">
-                        <div class="live-name">
-                            <span id="previewName">Unbenannt</span>
-                            <span class="live-indicator" id="previewIndicator"></span>
+                        <div class="live-name-container">
+                            <div class="live-name">
+                                <span id="previewName">Konata</span>
+                                <div class="live-indicator" id="previewIndicator"></div>
+                            </div>
+                            <div class="live-story-name" id="previewStoryName">Konata Izumi</div>
                         </div>
-                        <div class="live-badge">Character</div>
+                        <span class="live-badge" id="previewVisibilityBadge">Privat</span>
                     </div>
-                    <div class="live-subtitle" id="previewSubtitle">Rolle oder Herkunft</div>
-                    <div class="live-description" id="previewDesc">Gib links Informationen ein, um die Echtzeit-Vorschau für das Premium-Dashboard zu aktualisieren...</div>
-                    <div class="live-tags" id="previewTags">
-                        <span class="live-tag-badge">Neu</span>
+
+                    <div class="live-subtitle" id="previewShortDesc">Anime Otaku • Fröhlich</div>
+                    
+                    <div class="live-description" id="previewDescription">
+                        Wähle Felder links aus, um die Live-Vorschau der Engine-Generierung zu sehen...
+                    </div>
+
+                    <div class="preview-details-grid">
+                        <div class="preview-detail-item"><strong>Status:</strong> <span id="previewStatusText">Lokal angelegt</span></div>
+                    </div>
+
+                    <div class="live-tags" id="previewTags"></div>
+                    
+                    <div class="live-secrets-count" id="previewSecretsCount">
+                        🔒 0 aktive Secrets hinterlegt
                     </div>
                 </div>
             </div>
@@ -480,100 +656,195 @@
     </div>
 
     <script>
-        let currentTags = ['Custom', 'User-Made'];
+        let currentTags = ['Otaku', 'Comedy'];
+        let currentSecrets = [];
 
-        function renderTags() {
-            // Render inside input form wrapper
-            const wrapper = document.getElementById('tagsWrapper');
-            const input = document.getElementById('tagInput');
+        // Überprüfung, ob der User in Perchance eingeloggt ist
+        function checkPerchanceLogin() {
+            const urlParams = new URLSearchParams(window.location.search);
+            // Sucht nach Parametern aus der URL
+            const perchanceUser = urlParams.get('perchanceUser') || urlParams.get('user') || urlParams.get('username');
             
-            // Clear existing ones except input
-            const existingTags = wrapper.querySelectorAll('.dynamic-tag');
-            existingTags.forEach(t => t.remove());
+            // Validierung: Ein echter Name darf nicht leer, undefined oder unaufgelöster Text sein
+            const isLoggedIn = perchanceUser && 
+                               perchanceUser !== 'undefined' && 
+                               perchanceUser !== 'null' && 
+                               perchanceUser.trim() !== '' && 
+                               !perchanceUser.includes('[');
 
-            currentTags.forEach((tag, idx) => {
-                const tagEl = document.createElement('div');
-                tagEl.className = 'dynamic-tag';
-                tagEl.innerHTML = `${tag} <span onclick="removeTag(${idx})">&times;</span>`;
-                wrapper.insertBefore(tagEl, input);
-            });
-
-            // Update live preview tags too
-            const previewTagsContainer = document.getElementById('previewTags');
-            if(currentTags.length === 0) {
-                previewTagsContainer.innerHTML = '<span class="live-tag-badge">Keine Tags</span>';
-            } else {
-                previewTagsContainer.innerHTML = currentTags.map(t => `<span class="live-tag-badge">${t}</span>`).join('');
-            }
-        }
-
-        function handleTagInput(e) {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const val = e.target.value.trim();
-                if (val && !currentTags.includes(val)) {
-                    currentTags.push(val);
-                    e.target.value = '';
-                    renderTags();
+            const publicOption = document.getElementById('publicOption');
+            if (publicOption) {
+                if (isLoggedIn) {
+                    publicOption.style.display = 'block'; // Zeige Public an
+                } else {
+                    publicOption.style.display = 'none';  // Verstecke Public
+                    document.getElementById('charVisibility').value = 'private'; // Fallback auf privat
                 }
             }
         }
 
-        function removeTag(index) {
-            currentTags.splice(index, 1);
-            renderTags();
-        }
+        // Falls du den Status auch dynamisch über postMessage ändern willst
+        window.addEventListener('message', (event) => {
+            if (event.data && event.data.type === 'PERCHANCE_USER_STATUS') {
+                const publicOption = document.getElementById('publicOption');
+                if (publicOption) {
+                    if (event.data.isLoggedIn) {
+                        publicOption.style.display = 'block';
+                    } else {
+                        publicOption.style.display = 'none';
+                        document.getElementById('charVisibility').value = 'private';
+                    }
+                }
+                updatePreview();
+            }
+        });
 
         function updatePreview() {
-            const name = document.getElementById('charName').value.trim();
-            const subtitle = document.getElementById('charSubtitle').value.trim();
-            const avatar = document.getElementById('charAvatar').value.trim();
-            const desc = document.getElementById('charDesc').value.trim();
+            const name = document.getElementById('charName').value || 'Unbenannt';
+            const storyName = document.getElementById('charStoryName').value || '';
+            const shortDesc = document.getElementById('charShortDesc').value || 'Keine Kurzbeschreibung';
+            const appearance = document.getElementById('charAppearance').value || '';
+            const personality = document.getElementById('charPersonality').value || '';
+            const visibility = document.getElementById('charVisibility').value;
             const color = document.getElementById('charColor').value;
 
-            // Update Text Nodes
-            document.getElementById('previewName').innerText = name ? name : 'Unbenannt';
-            document.getElementById('previewSubtitle').innerText = subtitle ? subtitle : 'Rolle oder Herkunft';
-            document.getElementById('previewDesc').innerText = desc ? desc : 'Gib links Informationen ein, um die Echtzeit-Vorschau für das Premium-Dashboard zu aktualisieren...';
-
-            // Update Avatar Frame background
-            const avatarFrame = document.getElementById('previewAvatar');
-            if (avatar) {
-                avatarFrame.style.backgroundImage = `url('${avatar}')`;
+            document.getElementById('previewName').innerText = name;
+            document.getElementById('previewStoryName').innerText = storyName;
+            document.getElementById('previewShortDesc').innerText = shortDesc;
+            
+            // Sichtbarkeits-Abzeichen aktualisieren
+            const visBadge = document.getElementById('previewVisibilityBadge');
+            if(visibility === 'public') {
+                visBadge.innerText = 'Public';
+                visBadge.style.background = 'rgba(16, 185, 129, 0.2)';
+                visBadge.style.color = '#10b981';
             } else {
-                avatarFrame.style.backgroundImage = "url('https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80')";
+                visBadge.innerText = 'Privat';
+                visBadge.style.background = 'rgba(255, 255, 255, 0.05)';
+                visBadge.style.color = 'var(--text-muted)';
             }
 
-            // Update Color Highlights
+            // Preview-Text kombinieren
+            let descSnippet = '';
+            if(appearance) descSnippet += `<strong>[Aussehen]</strong> ${appearance.substring(0,60)}...<br>`;
+            if(personality) descSnippet += `<strong>[Persönlichkeit]</strong> ${personality.substring(0,60)}...`;
+            document.getElementById('previewDescription').innerHTML = descSnippet || 'Wähle Felder links aus, um die Live-Vorschau der Engine-Generierung zu sehen...';
+
+            // Avatar & Banner
+            const avatarUrl = document.getElementById('charAvatar').value;
+            if(avatarUrl) document.getElementById('previewAvatar').style.backgroundImage = `url('${avatarUrl}')`;
+            
+            const coverUrl = document.getElementById('charCoverUrl').value;
+            if(coverUrl) document.getElementById('previewBanner').style.backgroundImage = `url('${coverUrl}')`;
+
+            // Color Highlights
             const indicator = document.getElementById('previewIndicator');
             indicator.style.backgroundColor = color;
             indicator.style.boxShadow = `0 0 10px ${color}`;
             
             const card = document.getElementById('previewCard');
             card.style.borderColor = `${color}44`;
+
+            renderTagsPreview();
         }
 
+        // Secrets Management
+        function renderSecrets() {
+            const container = document.getElementById('secretsListDisplay');
+            container.innerHTML = '';
+            currentSecrets.forEach((sec, idx) => {
+                const item = document.createElement('div');
+                item.className = 'secret-item';
+                item.innerHTML = `<span>🔒 ${sec}</span><span class="remove-btn" onclick="removeSecret(${idx})">×</span>`;
+                container.appendChild(item);
+            });
+            document.getElementById('previewSecretsCount').innerText = `🔒 ${currentSecrets.length} aktive Secrets hinterlegt`;
+        }
+
+        function addSecret() {
+            const input = document.getElementById('secretInput');
+            if(input.value.trim()) {
+                currentSecrets.push(input.value.trim());
+                input.value = '';
+                renderSecrets();
+            }
+        }
+
+        function removeSecret(idx) {
+            currentSecrets.splice(idx, 1);
+            renderSecrets();
+        }
+
+        // Tags Management
+        function renderTags() {
+            const container = document.getElementById('tagsWrapper');
+            container.innerHTML = '';
+            currentTags.forEach((tag, idx) => {
+                const item = document.createElement('div');
+                item.className = 'dynamic-tag';
+                item.innerHTML = `${tag} <span onclick="removeTag(${idx})">×</span>`;
+                container.appendChild(item);
+            });
+            renderTagsPreview();
+        }
+
+        function renderTagsPreview() {
+            const container = document.getElementById('previewTags');
+            container.innerHTML = '';
+            currentTags.forEach(tag => {
+                const badge = document.createElement('span');
+                badge.className = 'live-tag-badge';
+                badge.innerText = tag;
+                container.appendChild(badge);
+            });
+        }
+
+        function addTag() {
+            const input = document.getElementById('tagInput');
+            if(input.value.trim() && !currentTags.includes(input.value.trim())) {
+                currentTags.push(input.value.trim());
+                input.value = '';
+                renderTags();
+            }
+        }
+
+        function removeTag(idx) {
+            currentTags.splice(idx, 1);
+            renderTags();
+        }
+
+        // Submit Payload verarbeiten
         function handleFormSubmit(e) {
             e.preventDefault();
             
-            // Simulierter Create-Ablauf
-            const newCharacter = {
-                name: document.getElementById('charName').value,
-                subtitle: document.getElementById('charSubtitle').value,
-                avatar: document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80',
-                description: document.getElementById('charDesc').value,
+            const fullCharacterEntity = {
+                characterName: document.getElementById('charName').value,
+                storyName: document.getElementById('charStoryName').value,
+                shortDesc: document.getElementById('charShortDesc').value,
+                visibility: document.getElementById('charVisibility').value, // Neuer Wert: "private" oder "public"
+                appearance: document.getElementById('charAppearance').value,
+                personality: document.getElementById('charPersonality').value,
+                generally: document.getElementById('charGenerally').value,
+                coverURL: document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80',
+                backgroundURL: document.getElementById('charCoverUrl').value || '',
                 engine: document.getElementById('charEngine').value,
                 color: document.getElementById('charColor').value,
-                tags: currentTags,
-                meta: 'User'
+                secrets: currentSecrets,
+                tags: currentTags
             };
 
-            alert(`🎉 Erfolg! Charakter "${newCharacter.name}" wurde virtuell erschaffen und der lokalen Instanz hinzugefügt.\n\nLeite dich zurück zum Dashboard Hub...`);
-            window.location.href = 'index.html';
+            console.log("Database Object Payload compiled:", fullCharacterEntity);
+            alert(`🎉 Erfolg! Charakter "${fullCharacterEntity.characterName}" wurde erfolgreich mit dem Status "${fullCharacterEntity.visibility === 'public' ? 'Public' : 'Privat'}" angelegt.\n\nLeite dich zurück zum Dashboard Hub...`);
+            window.location.href = '../index.html';
         }
 
-        // Initialize Tags on page load
-        renderTags();
+        // Initialer Start beim Laden
+        window.addEventListener('DOMContentLoaded', () => {
+            checkPerchanceLogin();
+            renderTags();
+            renderSecrets();
+            updatePreview();
+        });
     </script>
 </body>
 </html>
