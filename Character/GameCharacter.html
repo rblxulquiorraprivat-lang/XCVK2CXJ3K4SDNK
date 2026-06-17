@@ -697,6 +697,7 @@
         const SETTINGS_KEY = 'storyAI_settings';
         const PERSONA_KEY = 'storyAI_personas';
         const SELECTED_PERSONA_KEY = 'storyAI_selected_persona';
+        const STORY_PERSONA_KEY_PREFIX = 'storyAI_story_persona_';
         
         let currentCharacter = null;
         let chatHistory = [];
@@ -705,6 +706,33 @@
         let personaSearchQuery = '';
         let isPersonaMenuOpen = false;
         let isWaitingForAI = false;
+
+        function getStoryPersonaKey(characterId = null) {
+            const id = characterId !== null && characterId !== undefined ? characterId : currentCharacter?.id;
+            return id !== null && id !== undefined ? STORY_PERSONA_KEY_PREFIX + id : null;
+        }
+
+        function loadStoryPersonaId(characterId = null) {
+            try {
+                const key = getStoryPersonaKey(characterId);
+                if (!key) return null;
+                const raw = localStorage.getItem(key);
+                return raw ? parseInt(raw, 10) : null;
+            } catch (err) {
+                console.warn('Fehler beim Laden der Story-Persona:', err);
+                return null;
+            }
+        }
+
+        function saveStoryPersonaId(id) {
+            const key = getStoryPersonaKey();
+            if (!key) return;
+            if (id === null || id === undefined) {
+                localStorage.removeItem(key);
+            } else {
+                localStorage.setItem(key, id.toString());
+            }
+        }
         let settings = {
             textSize: 'Middle',
             language: 'English',
@@ -726,11 +754,11 @@
             const charId = parseInt(urlParams.get('id')); 
 
             let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            const selectedPersonaId = parseInt(localStorage.getItem(SELECTED_PERSONA_KEY), 10) || null;
             personas = JSON.parse(localStorage.getItem(PERSONA_KEY) || '[]');
-            selectedPersona = personas.find(p => p.id === selectedPersonaId) || null;
 
             currentCharacter = items.find(i => i.id === charId);
+            const selectedPersonaId = loadStoryPersonaId(charId);
+            selectedPersona = personas.find(p => p.id === selectedPersonaId) || null;
 
             if (!currentCharacter) {
                 alert("Kein aktiver Charakter ausgewählt! Leite zurück zum Hub.");
@@ -769,9 +797,12 @@
         }
 
         function formatJanitorText(text) {
-            // Very simple markdown-like parsing for italics (*text* or _text_)
-            let formatted = text.replace(/\*([^*]+)\*/g, '<em class="narration">*$1*</em>');
-            formatted = formatted.replace(/_([^_]+)_/g, '<em class="narration">_$1_</em>');
+            let formatted = text;
+            // Convert double-asterisk and single-asterisk narration markers to styled text without leaving the markers.
+            formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<em class="narration">$1</em>');
+            formatted = formatted.replace(/\*([^*]+)\*/g, '<em class="narration">$1</em>');
+            formatted = formatted.replace(/__([^_]+)__/g, '<em class="narration">$1</em>');
+            formatted = formatted.replace(/_([^_]+)_/g, '<em class="narration">$1</em>');
             // Basic line breaks
             formatted = formatted.replace(/\n/g, '<br>');
             return formatted;
@@ -816,11 +847,7 @@
 
         function selectPersona(id) {
             selectedPersona = personas.find(p => p.id === id) || null;
-            if (selectedPersona) {
-                localStorage.setItem(SELECTED_PERSONA_KEY, id.toString());
-            } else {
-                localStorage.removeItem(SELECTED_PERSONA_KEY);
-            }
+            saveStoryPersonaId(selectedPersona ? id : null);
             isPersonaMenuOpen = false;
             updatePersonaButton();
             renderPersonaMenu();
@@ -884,7 +911,7 @@
 
         function buildAIPrompt() {
             // Construct a prompt context based on character info and chat history
-            let prompt = `You are roleplaying as a character named ${currentCharacter.name}.\n`;
+            let prompt = `You are not roleplaying a character; you are ${currentCharacter.name}.\n`;
             prompt += `Name: ${currentCharacter.name}.\n`;
             if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
             if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
@@ -893,6 +920,11 @@
                 prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
             }
             prompt += `Description: ${currentCharacter.description}.\n`;
+            if (selectedPersona) {
+                prompt += `Persona: ${selectedPersona.name}.\n`;
+                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.\n`;
+                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.\n`;
+            }
 
             const textSizeInstruction = settings.textSize === 'Short'
                 ? 'Keep replies short and concise.'
@@ -908,7 +940,7 @@
                         : 'Answer in English.';
 
             prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
-            prompt += `Respond in character. Use asterisks like *this* to describe actions or expressions.\n\n`;
+            prompt += `When speaking, wrap spoken text in double quotes. Use asterisks only to mark actions or expressions. The final output should not keep the asterisks in the rendered text.\n\n`;
 
             // Add conversation history
             const contextLimit = 10; // Only send last few messages to save context/time
@@ -941,7 +973,7 @@
                         ? 'Répondre en français.'
                         : 'Answer in English.';
             
-            let prompt = `You are roleplaying as a character named ${currentCharacter.name}.\n`;
+            let prompt = `You are not roleplaying a character; you are ${currentCharacter.name}.\n`;
             prompt += `Name: ${currentCharacter.name}.\n`;
             if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
             if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
@@ -950,8 +982,13 @@
                 prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
             }
             prompt += `Description: ${currentCharacter.description}.\n`;
+            if (selectedPersona) {
+                prompt += `Persona: ${selectedPersona.name}.\n`;
+                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.\n`;
+                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.\n`;
+            }
             prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
-            prompt += `Write an introductory greeting for a roleplay. Include actions in asterisks. Respond in character.`;
+            prompt += `Write an introductory greeting as ${currentCharacter.name}. Wrap spoken sentences in double quotes. Use asterisks only for actions or expressions, and do not keep them in the final output.`;
             
             try {
                 const responseText = await perchanceBridge.generateText(prompt, ['User:']);
