@@ -366,16 +366,6 @@
             box-shadow: 0 0 8px var(--color-primary);
         }
 
-        .live-badge {
-            font-size: 0.7rem;
-            text-transform: uppercase;
-            background: rgba(255,255,255,0.05);
-            color: var(--text-muted);
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-weight: 700;
-        }
-
         .live-subtitle {
             color: var(--text-muted);
             font-size: 0.9rem;
@@ -499,29 +489,14 @@
                     1. Identitäts- & Systemdaten
                 </div>
 
-                <div class="form-group row-2">
-                    <div>
-                        <label class="form-label" for="charName">Character Name (Main Menu Anzeige)</label>
-                        <input type="text" id="charName" class="form-control" placeholder="z.B. Konata" required oninput="updatePreview()">
-                    </div>
-                    <div>
-                        <label class="form-label" for="charStoryName">Story Name (Eigentlicher Name)</label>
-                        <input type="text" id="charStoryName" class="form-control" placeholder="z.B. Konata Izumi" required oninput="updatePreview()">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="charStoryName">Charakter Name</label>
+                    <input type="text" id="charStoryName" class="form-control" placeholder="z.B. Konata Izumi" required oninput="updatePreview()">
                 </div>
 
-                <div class="form-group row-2">
-                    <div>
-                        <label class="form-label" for="charVisibility">Sichtbarkeit</label>
-                        <select id="charVisibility" class="form-control" onchange="updatePreview()">
-                            <option value="private">Privat</option>
-                            <option value="public" id="publicOption" style="display: none;">Public (Öffentlich)</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label" for="charShortDesc">ShortDesc (Kurzbeschreibung)</label>
-                        <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" required oninput="updatePreview()">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="charShortDesc">ShortDesc (Kurzbeschreibung)</label>
+                    <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" required oninput="updatePreview()">
                 </div>
 
                 <div class="section-subtitle">
@@ -560,19 +535,9 @@
                     </div>
                 </div>
 
-                <div class="form-group row-2">
-                    <div>
-                        <label class="form-label" for="charEngine">AI Logic Engine Template</label>
-                        <select id="charEngine" class="form-control">
-                            <option value="StoryAI-v4-Pro">StoryAI v4 Pro (Recommended)</option>
-                            <option value="StoryAI-v3-Legacy">StoryAI v3 Legacy</option>
-                            <option value="RP-Creative-Specialist">RP Creative Specialist</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="form-label" for="charColor">Hex Theme Color Accent</label>
-                        <input type="color" id="charColor" class="form-control" value="#6366f1" oninput="updatePreview()">
-                    </div>
+                <div class="form-group">
+                    <label class="form-label" for="charColor">Hex Theme Color Accent</label>
+                    <input type="color" id="charColor" class="form-control" value="#6366f1" oninput="updatePreview()">
                 </div>
 
                 <div class="section-subtitle">
@@ -606,14 +571,14 @@
 
                 <button type="submit" class="create-submit-btn">
                     <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    Charakter-Entität lokal initialisieren
+                    <span class="submit-text">Charakter-Entität lokal initialisieren</span>
                 </button>
             </form>
         </main>
 
         <aside class="creator-preview-panel">
             <div class="preview-sticky-title">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z"/></aside>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
                 Echtzeit-Vorschau
             </div>
 
@@ -626,12 +591,10 @@
                     <div class="live-title-row">
                         <div class="live-name-container">
                             <div class="live-name">
-                                <span id="previewName">Konata</span>
+                                <span id="previewStoryName">Konata Izumi</span>
                                 <div class="live-indicator" id="previewIndicator"></div>
                             </div>
-                            <div class="live-story-name" id="previewStoryName">Konata Izumi</div>
                         </div>
-                        <span class="live-badge" id="previewVisibilityBadge">Privat</span>
                     </div>
 
                     <div class="live-subtitle" id="previewShortDesc">Anime Otaku • Fröhlich</div>
@@ -656,73 +619,25 @@
     </div>
 
     <script>
-        let currentTags = ['Otaku', 'Comedy'];
+        let currentTags = [];
         let currentSecrets = [];
+        let editId = null;
+        let isEditing = false;
 
-        // Überprüfung, ob der User in Perchance eingeloggt ist
-        function checkPerchanceLogin() {
-            const urlParams = new URLSearchParams(window.location.search);
-            // Sucht nach Parametern aus der URL
-            const perchanceUser = urlParams.get('perchanceUser') || urlParams.get('user') || urlParams.get('username');
-            
-            // Validierung: Ein echter Name darf nicht leer, undefined oder unaufgelöster Text sein
-            const isLoggedIn = perchanceUser && 
-                               perchanceUser !== 'undefined' && 
-                               perchanceUser !== 'null' && 
-                               perchanceUser.trim() !== '' && 
-                               !perchanceUser.includes('[');
-
-            const publicOption = document.getElementById('publicOption');
-            if (publicOption) {
-                if (isLoggedIn) {
-                    publicOption.style.display = 'block'; // Zeige Public an
-                } else {
-                    publicOption.style.display = 'none';  // Verstecke Public
-                    document.getElementById('charVisibility').value = 'private'; // Fallback auf privat
-                }
-            }
+        function getQueryParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
         }
 
-        // Falls du den Status auch dynamisch über postMessage ändern willst
-        window.addEventListener('message', (event) => {
-            if (event.data && event.data.type === 'PERCHANCE_USER_STATUS') {
-                const publicOption = document.getElementById('publicOption');
-                if (publicOption) {
-                    if (event.data.isLoggedIn) {
-                        publicOption.style.display = 'block';
-                    } else {
-                        publicOption.style.display = 'none';
-                        document.getElementById('charVisibility').value = 'private';
-                    }
-                }
-                updatePreview();
-            }
-        });
-
         function updatePreview() {
-            const name = document.getElementById('charName').value || 'Unbenannt';
-            const storyName = document.getElementById('charStoryName').value || '';
+            const storyName = document.getElementById('charStoryName').value || 'Unbenannt';
             const shortDesc = document.getElementById('charShortDesc').value || 'Keine Kurzbeschreibung';
             const appearance = document.getElementById('charAppearance').value || '';
             const personality = document.getElementById('charPersonality').value || '';
-            const visibility = document.getElementById('charVisibility').value;
             const color = document.getElementById('charColor').value;
 
-            document.getElementById('previewName').innerText = name;
             document.getElementById('previewStoryName').innerText = storyName;
             document.getElementById('previewShortDesc').innerText = shortDesc;
-            
-            // Sichtbarkeits-Abzeichen aktualisieren
-            const visBadge = document.getElementById('previewVisibilityBadge');
-            if(visibility === 'public') {
-                visBadge.innerText = 'Public';
-                visBadge.style.background = 'rgba(16, 185, 129, 0.2)';
-                visBadge.style.color = '#10b981';
-            } else {
-                visBadge.innerText = 'Privat';
-                visBadge.style.background = 'rgba(255, 255, 255, 0.05)';
-                visBadge.style.color = 'var(--text-muted)';
-            }
 
             // Preview-Text kombinieren
             let descSnippet = '';
@@ -799,6 +714,25 @@
             });
         }
 
+        function populateForm(item) {
+            editId = item.id;
+            isEditing = true;
+            document.getElementById('charStoryName').value = item.name || item.storyName || '';
+            document.getElementById('charShortDesc').value = item.shortDesc || item.subtitle || '';
+            document.getElementById('charAppearance').value = item.appearance || '';
+            document.getElementById('charPersonality').value = item.personality || '';
+            document.getElementById('charGenerally').value = item.generally || '';
+            document.getElementById('charAvatar').value = item.avatar || item.coverURL || '';
+            document.getElementById('charCoverUrl').value = item.backgroundURL || '';
+            document.getElementById('charColor').value = item.color || '#6366f1';
+            currentTags = Array.isArray(item.tags) ? [...item.tags] : [];
+            currentSecrets = Array.isArray(item.secrets) ? [...item.secrets] : [];
+            renderTags();
+            renderSecrets();
+            updatePreview();
+            document.querySelector('.create-submit-btn').innerText = 'Charakter speichern';
+        }
+
         function addTag() {
             const input = document.getElementById('tagInput');
             if(input.value.trim() && !currentTags.includes(input.value.trim())) {
@@ -813,37 +747,111 @@
             renderTags();
         }
 
+        const STORAGE_KEY = 'storyAI_items';
+
+        function loadStoredItems() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            } catch (err) {
+                console.warn('Fehler beim Laden gespeicherter Items:', err);
+                return [];
+            }
+        }
+
+        function saveStoredItems(items) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        }
+
         // Submit Payload verarbeiten
         function handleFormSubmit(e) {
             e.preventDefault();
             
+            const savedItems = loadStoredItems();
+            const shortDesc = document.getElementById('charShortDesc').value;
+            const appearance = document.getElementById('charAppearance').value;
+            const personality = document.getElementById('charPersonality').value;
+            const generally = document.getElementById('charGenerally').value;
+            const avatarUrl = document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80';
+            const coverUrl = document.getElementById('charCoverUrl').value || '';
+
             const fullCharacterEntity = {
-                characterName: document.getElementById('charName').value,
+                id: editId || savedItems.reduce((maxId, item) => Math.max(maxId, item.id || 0), 6) + 1,
+                type: 'character',
+                name: document.getElementById('charStoryName').value,
                 storyName: document.getElementById('charStoryName').value,
-                shortDesc: document.getElementById('charShortDesc').value,
-                visibility: document.getElementById('charVisibility').value, // Neuer Wert: "private" oder "public"
-                appearance: document.getElementById('charAppearance').value,
-                personality: document.getElementById('charPersonality').value,
-                generally: document.getElementById('charGenerally').value,
-                coverURL: document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80',
-                backgroundURL: document.getElementById('charCoverUrl').value || '',
-                engine: document.getElementById('charEngine').value,
+                subtitle: shortDesc,
+                shortDesc,
+                description: [appearance, personality, generally].filter(Boolean).join(' '),
+                appearance,
+                personality,
+                generally,
+                avatar: avatarUrl,
+                coverURL: avatarUrl,
+                backgroundURL: coverUrl,
                 color: document.getElementById('charColor').value,
                 secrets: currentSecrets,
-                tags: currentTags
+                tags: currentTags,
+                lastPlayed: Date.now(),
+                engine: 'StoryAI Creator',
+                favorite: false,
+                isUserCreated: true
             };
 
+            if (isEditing) {
+                const index = savedItems.findIndex(item => item.id === editId);
+                if (index > -1) {
+                    savedItems[index] = fullCharacterEntity;
+                } else {
+                    savedItems.push(fullCharacterEntity);
+                }
+            } else {
+                savedItems.push(fullCharacterEntity);
+            }
+
+            saveStoredItems(savedItems);
+
             console.log("Database Object Payload compiled:", fullCharacterEntity);
-            alert(`🎉 Erfolg! Charakter "${fullCharacterEntity.characterName}" wurde erfolgreich mit dem Status "${fullCharacterEntity.visibility === 'public' ? 'Public' : 'Privat'}" angelegt.\n\nLeite dich zurück zum Dashboard Hub...`);
+            alert(`🎉 Erfolg! Charakter "${fullCharacterEntity.storyName}" wurde erfolgreich ${isEditing ? 'aktualisiert' : 'angelegt'}.\n\nLeite dich zurück zum Dashboard Hub...`);
             window.location.href = '../index.html';
+        }
+
+        function initializeForm() {
+            const editParam = getQueryParam('id');
+            if (!editParam) {
+                currentTags = ['Otaku', 'Comedy'];
+                currentSecrets = [];
+                renderTags();
+                renderSecrets();
+                updatePreview();
+                return;
+            }
+
+            const editIdValue = parseInt(editParam, 10);
+            if (Number.isNaN(editIdValue)) {
+                currentTags = ['Otaku', 'Comedy'];
+                currentSecrets = [];
+                renderTags();
+                renderSecrets();
+                updatePreview();
+                return;
+            }
+
+            const savedItems = loadStoredItems();
+            const storedItem = savedItems.find(item => item.id === editIdValue);
+            if (storedItem) {
+                populateForm(storedItem);
+            } else {
+                currentTags = ['Otaku', 'Comedy'];
+                currentSecrets = [];
+                renderTags();
+                renderSecrets();
+                updatePreview();
+            }
         }
 
         // Initialer Start beim Laden
         window.addEventListener('DOMContentLoaded', () => {
-            checkPerchanceLogin();
-            renderTags();
-            renderSecrets();
-            updatePreview();
+            initializeForm();
         });
     </script>
 </body>
