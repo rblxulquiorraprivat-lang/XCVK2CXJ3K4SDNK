@@ -104,6 +104,27 @@
             border-color: rgba(255, 255, 255, 0.2);
         }
 
+        .persona-icon-btn {
+            background: rgba(148, 163, 184, 0.12);
+            border: 1px solid rgba(148, 163, 184, 0.25);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: #cbd5e1;
+            transition: var(--transition);
+        }
+
+        .persona-icon-btn:hover {
+            background: rgba(148, 163, 184, 0.18);
+            color: #fff;
+            transform: translateY(-1px);
+            border-color: rgba(148, 163, 184, 0.4);
+        }
+
         .section-title {
             padding: 24px 24px 12px;
             font-size: 0.8rem;
@@ -487,6 +508,18 @@
             border-color: rgba(255, 255, 255, 0.2);
         }
 
+        .card-btn-delete {
+            background: rgba(244, 63, 94, 0.12);
+            border-color: rgba(244, 63, 94, 0.25);
+            color: #fda4af;
+        }
+
+        .card-btn-delete:hover {
+            background: rgba(244, 63, 94, 0.18);
+            border-color: rgba(244, 63, 94, 0.4);
+            color: #fee2e2;
+        }
+
         /* --- DETAIL & SETTINGS VIEW --- */
         .back-btn {
             background: rgba(255, 255, 255, 0.05);
@@ -650,6 +683,9 @@
                         <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l-.38 2.65c-.03.24.17.42.42.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
                     </svg>
                 </button>
+                <button class="persona-icon-btn" onclick="openPersona()" title="Personas">
+                    🎭
+                </button>
             </div>
         </div>
         <div class="section-title">Zuletzt aktiv</div>
@@ -662,6 +698,72 @@
 
     <script>
         const STORAGE_KEY = 'storyAI_items';
+        const CHAT_HISTORY_PREFIX = 'storyAI_chat_';
+        const SETTINGS_KEY = 'storyAI_settings';
+        const PERSONA_KEY = 'storyAI_personas';
+        const SELECTED_PERSONA_KEY = 'storyAI_selected_persona';
+
+        let settings = {
+            textSize: 'Middle',
+            language: 'English',
+            model: 'StoryAI Ultra v2.5',
+            apiKey: ''
+        };
+
+        function loadStoredSettings() {
+            try {
+                return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || {};
+            } catch (err) {
+                console.warn('Fehler beim Laden gespeicherter Einstellungen:', err);
+                return {};
+            }
+        }
+
+        function loadStoredPersonas() {
+            try {
+                return JSON.parse(localStorage.getItem(PERSONA_KEY) || '[]');
+            } catch (err) {
+                console.warn('Fehler beim Laden gespeicherter Personas:', err);
+                return [];
+            }
+        }
+
+        function savePersonas(personas) {
+            localStorage.setItem(PERSONA_KEY, JSON.stringify(personas));
+        }
+
+        function loadSelectedPersonaId() {
+            try {
+                const raw = localStorage.getItem(SELECTED_PERSONA_KEY);
+                return raw ? parseInt(raw, 10) : null;
+            } catch (err) {
+                console.warn('Fehler beim Laden der ausgewählten Persona:', err);
+                return null;
+            }
+        }
+
+        function saveSelectedPersonaId(id) {
+            if (id === null || id === undefined) {
+                localStorage.removeItem(SELECTED_PERSONA_KEY);
+            } else {
+                localStorage.setItem(SELECTED_PERSONA_KEY, id.toString());
+            }
+        }
+
+        function saveSettings() {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+        }
+
+        function setSetting(key, value) {
+            settings[key] = value;
+            saveSettings();
+            renderMainArea();
+        }
+
+        const storedSettings = loadStoredSettings();
+        settings = { ...settings, ...storedSettings };
+        let personas = loadStoredPersonas();
+        let selectedPersonaId = loadSelectedPersonaId();
 
         let items = [
             {
@@ -721,6 +823,45 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(itemsToSave));
         }
 
+        function getStoryMessageCount(itemId) {
+            try {
+                const raw = localStorage.getItem(CHAT_HISTORY_PREFIX + itemId);
+                const history = JSON.parse(raw || '[]');
+                return Array.isArray(history) ? history.length : 0;
+            } catch (err) {
+                return 0;
+            }
+        }
+
+        function generateNewItemId() {
+            return items.reduce((maxId, item) => Math.max(maxId, item.id || 0), 0) + 1;
+        }
+
+        function createStoryFromCharacter(characterId) {
+            const character = items.find(i => i.id === characterId && i.type === 'character');
+            if (!character) return;
+            const newStory = {
+                id: generateNewItemId(),
+                type: 'story',
+                name: `Story: ${character.name}`,
+                subtitle: character.subtitle || 'Interaktives Story-Erlebnis',
+                description: character.description || '',
+                avatar: character.avatar || character.cover || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&q=80',
+                color: character.color || '#8b5cf6',
+                tags: character.tags || [],
+                lastPlayed: Date.now(),
+                engine: character.engine || settings.model,
+                favorite: false,
+                generally: character.generally || '',
+                appearance: character.appearance || '',
+                personality: character.personality || '',
+                secrets: character.secrets || []
+            };
+            items.push(newStory);
+            saveStoredItems(items);
+            window.location.href = `Character/GameCharacter.html?id=${newStory.id}`;
+        }
+
         const storedItems = loadStoredItems();
         if (storedItems.length) {
             const merged = new Map(items.map(item => [item.id, item]));
@@ -733,9 +874,12 @@
         }
 
         let activeId = null;
-        let isSettingsActive = false; 
+        let isSettingsActive = false;
+        let isPersonaActive = false;
+        let editingPersonaId = null;
         let currentFilter = 'all';
         let searchQuery = '';
+        let personaViewSearchQuery = '';
 
         function timeAgo(timestamp) {
             const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -789,7 +933,12 @@
             if (!grid) return;
             const filteredItems = getFilteredItems();
             const gridHTML = filteredItems.map(item => {
-                let typeLabel = item.type === 'character' ? 'Charakter' : item.type === 'world' ? 'Welt' : 'Story';
+                const isStory = item.type === 'story';
+                const typeLabel = isStory ? `💬: ${getStoryMessageCount(item.id)}` : item.type === 'character' ? 'Charakter' : 'Welt';
+                const actionLabel = isStory ? 'Continue' : 'Play';
+                const actionHandler = isStory
+                    ? `event.stopPropagation(); window.location.href='Character/GameCharacter.html?id=${item.id}'`
+                    : `event.stopPropagation(); createStoryFromCharacter(${item.id})`;
                 return `
                     <div class="lib-card animate-in" onclick="openDetail(${item.id})">
                         <div class="card-badge">${typeLabel}</div>
@@ -808,7 +957,7 @@
                             <div class="card-desc">${item.description}</div>
                             <div class="card-footer">
                                 <div class="card-actions">
-                                    <button class="card-btn card-btn-play" onclick="event.stopPropagation(); window.location.href='Character/GameCharacter.html?id=${item.id}'">Play</button>
+                                    <button class="card-btn card-btn-play" onclick="${actionHandler}">${actionLabel}</button>
                                     <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); window.location.href='Character/CreateCharacter.html?id=${item.id}'">Edit</button>
                                 </div>
                             </div>
@@ -832,7 +981,7 @@
 
         function handleSearch(event) {
             searchQuery = event.target.value.toLowerCase();
-            if (!isSettingsActive && activeId === null) {
+            if (!isSettingsActive && !isPersonaActive && activeId === null) {
                 renderLibraryGrid();
                 return;
             }
@@ -851,14 +1000,123 @@
 
         function openSettings() {
             activeId = null;
+            isPersonaActive = false;
             isSettingsActive = true;
+            renderApp();
+        }
+
+        function openPersona() {
+            activeId = null;
+            isSettingsActive = false;
+            isPersonaActive = true;
             renderApp();
         }
 
         function goBackToLibrary() {
             activeId = null;
             isSettingsActive = false;
+            isPersonaActive = false;
             renderApp();
+        }
+
+        function savePersona(event) {
+            event.preventDefault();
+            const name = document.getElementById('personaName').value.trim();
+            const cover = document.getElementById('personaCover').value.trim();
+            const generally = document.getElementById('personaGenerally').value.trim();
+            const appearance = document.getElementById('personaAppearance').value.trim();
+
+            if (!name) {
+                alert('Bitte gib deiner Persona einen Namen.');
+                return;
+            }
+
+            if (editingPersonaId) {
+                const persona = personas.find(p => p.id === editingPersonaId);
+                if (persona) {
+                    persona.name = name;
+                    persona.cover = cover;
+                    persona.generally = generally;
+                    persona.appearance = appearance;
+                }
+                editingPersonaId = null;
+                alert('Persona wurde aktualisiert.');
+            } else {
+                const newPersona = {
+                    id: Date.now(),
+                    name,
+                    cover,
+                    generally,
+                    appearance
+                };
+
+                personas.unshift(newPersona);
+                if (!selectedPersonaId) {
+                    selectedPersonaId = newPersona.id;
+                    saveSelectedPersonaId(selectedPersonaId);
+                }
+                alert('Persona wurde gespeichert.');
+            }
+
+            savePersonas(personas);
+            renderApp();
+
+            document.getElementById('personaName').value = '';
+            document.getElementById('personaCover').value = '';
+            document.getElementById('personaGenerally').value = '';
+            document.getElementById('personaAppearance').value = '';
+        }
+
+        function startPersonaEdit(id) {
+            const persona = personas.find(p => p.id === id);
+            if (!persona) return;
+            editingPersonaId = id;
+            renderApp();
+        }
+
+        function deletePersona(id) {
+            if (!confirm('Diese Persona wirklich löschen?')) return;
+            personas = personas.filter(p => p.id !== id);
+            if (selectedPersonaId === id) {
+                selectedPersonaId = personas.length ? personas[0].id : null;
+                saveSelectedPersonaId(selectedPersonaId);
+            }
+            savePersonas(personas);
+            if (editingPersonaId === id) {
+                editingPersonaId = null;
+            }
+            renderApp();
+        }
+
+        function setSelectedPersona(id) {
+            selectedPersonaId = id;
+            saveSelectedPersonaId(id);
+            renderApp();
+        }
+
+        function clearSelectedPersona() {
+            selectedPersonaId = null;
+            saveSelectedPersonaId(null);
+            renderApp();
+        }
+
+        function cancelPersonaEdit() {
+            editingPersonaId = null;
+            renderApp();
+        }
+
+        function populatePersonaFormFields() {
+            if (!editingPersonaId) return;
+            const persona = personas.find(p => p.id === editingPersonaId);
+            if (!persona) return;
+            const nameInput = document.getElementById('personaName');
+            const coverInput = document.getElementById('personaCover');
+            const generallyInput = document.getElementById('personaGenerally');
+            const appearanceInput = document.getElementById('personaAppearance');
+            if (nameInput) nameInput.value = persona.name;
+            if (coverInput) coverInput.value = persona.cover;
+            if (generallyInput) generallyInput.value = persona.generally;
+            if (appearanceInput) appearanceInput.value = persona.appearance;
         }
 
         /* Favoriten umschalten */
@@ -874,7 +1132,7 @@
                     currentFilter = 'all';
                 }
                 
-                if (!isSettingsActive && activeId === null) {
+                if (!isSettingsActive && !isPersonaActive && activeId === null) {
                     renderFilterTabs();
                     renderLibraryGrid();
                     return;
@@ -885,6 +1143,93 @@
 
         function renderMainArea() {
             const main = document.getElementById('dashboardMain');
+
+            // 1. PERSONA ANSICHT
+            if (isPersonaActive) {
+                const sortedPersonas = [...personas].sort((a, b) => {
+                    if (selectedPersonaId === a.id) return -1;
+                    if (selectedPersonaId === b.id) return 1;
+                    return a.name.localeCompare(b.name);
+                });
+
+                const visiblePersonas = sortedPersonas.filter(persona => {
+                    const query = personaViewSearchQuery.trim().toLowerCase();
+                    if (!query) return true;
+                    return `${persona.name} ${persona.generally || ''} ${persona.appearance || ''}`.toLowerCase().includes(query);
+                });
+
+                const personaCards = visiblePersonas.length ? visiblePersonas.map(persona => {
+                    const isDefault = selectedPersonaId === persona.id;
+                    return `
+                    <div class="lib-card animate-in" style="border: ${isDefault ? '1px solid #8b5cf6' : '1px solid transparent'}; box-shadow: ${isDefault ? '0 0 0 1px rgba(139,92,246,0.18)' : ''};">
+                        <div class="card-cover" style="background-image: url('${persona.cover || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&q=80'}')"></div>
+                        <div class="card-body">
+                            <div class="card-title">
+                                ${persona.name || 'Unnamed Persona'}
+                                ${isDefault ? '<span style="font-size:0.75rem; margin-left:8px; color:#c4b5fd;">Default</span>' : ''}
+                            </div>
+                            <div class="card-subtitle" style="color: ${persona.color || '#94a3b8'}">${persona.generally || 'Keine Beschreibung'}</div>
+                            <div class="card-desc">${persona.appearance || 'Keine Angaben zur Erscheinung vorhanden.'}</div>
+                            <div class="card-footer" style="gap: 10px; margin-top: 16px;">
+                                <button type="button" class="card-btn card-btn-primary" onclick="${isDefault ? `clearSelectedPersona()` : `setSelectedPersona(${persona.id})`}">${isDefault ? 'Nicht Default' : 'Als Standard setzen'}</button>
+                                <button type="button" class="card-btn card-btn-edit" onclick="startPersonaEdit(${persona.id})">Edit</button>
+                                <button type="button" class="card-btn card-btn-delete" onclick="deletePersona(${persona.id})">Delete</button>
+                            </div>
+                        </div>
+                    </div>
+                `}).join('') : '';
+
+                main.innerHTML = `
+                    <div class="animate-in">
+                        <button class="back-btn" onclick="goBackToLibrary()">
+                            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                            Zurück zur Bibliothek
+                        </button>
+
+                        <div class="library-topbar" style="margin-bottom: 40px;">
+                            <div class="library-title">
+                                <h2>🎭 Personas</h2>
+                                <p>Verwalte deine Chat-Personas und erstelle neue für den KI-Dialog.</p>
+                            </div>
+                        </div>
+
+                        <div class="detail-grid" style="grid-template-columns: 1.4fr 0.9fr; gap: 24px; align-items: start;">
+                            <div class="detail-panel" style="max-height: calc(100vh - 260px); overflow: auto;">
+                                <h3>Deine Personas</h3>
+                                <input id="personaSearchInput" type="text" placeholder="Suche Personas..." value="${personaViewSearchQuery}" oninput="updatePersonaViewSearch(event)" style="width:100%; background: #1f2937; color:#fff; border:1px solid var(--border-color); padding:12px 14px; border-radius:14px; margin-top: 12px;">
+                                ${personas.length ? `<div class="library-grid" style="grid-template-columns: 1fr; gap: 16px; padding: 0; margin-top: 16px;">${personaCards}</div>` : `<p style="color: var(--text-muted); margin-top: 16px;">Keine Personas vorhanden. Erstelle eine neue Persona mit Cover, Generally und Appearance.</p>`}
+                            </div>
+                            <div class="detail-panel" style="max-height: calc(100vh - 260px); overflow: auto;">
+                                <h3>${editingPersonaId ? 'Persona bearbeiten' : 'Persona erstellen'}</h3>
+                                <form onsubmit="savePersona(event)">
+                                    <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                                        <label style="font-weight:600;">${editingPersonaId ? 'Persona bearbeiten' : 'Persona erstellen'}</label>
+                                        <input id="personaName" type="text" placeholder="Persona Name" value="${editingPersonaId ? (personas.find(p => p.id === editingPersonaId)?.name || '') : ''}" style="width:100%; background: #27272a; color:#fff; border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;" required>
+                                    </div>
+                                    <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                                        <label style="font-weight:600;">Cover (URL)</label>
+                                        <input id="personaCover" type="url" placeholder="https://..." value="${editingPersonaId ? (personas.find(p => p.id === editingPersonaId)?.cover || '') : ''}" style="width:100%; background: #27272a; color:#fff; border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">
+                                    </div>
+                                    <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                                        <label style="font-weight:600;">Generally</label>
+                                        <textarea id="personaGenerally" rows="3" placeholder="Allgemeine Infos zur Persona" style="width:100%; background: #27272a; color:#fff; border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">${editingPersonaId ? (personas.find(p => p.id === editingPersonaId)?.generally || '') : ''}</textarea>
+                                    </div>
+                                    <div class="settings-row" style="flex-direction: column; align-items: flex-start; gap: 8px;">
+                                        <label style="font-weight:600;">Appearance</label>
+                                        <textarea id="personaAppearance" rows="3" placeholder="Erscheinung der Persona" style="width:100%; background: #27272a; color:#fff; border:1px solid var(--border-color); padding:10px 14px; border-radius:12px;">${editingPersonaId ? (personas.find(p => p.id === editingPersonaId)?.appearance || '') : ''}</textarea>
+                                    </div>
+                                    <div style="display:flex; gap: 10px; margin-top: 16px;">
+                                        <button type="submit" class="create-btn" style="flex:1;">${editingPersonaId ? 'Änderungen speichern' : 'Persona speichern'}</button>
+                                        ${editingPersonaId ? '<button type="button" class="card-btn card-btn-delete" style="flex:1; background: rgba(255,255,255,0.05); color:#f8fafc;" onclick="cancelPersonaEdit()">Abbrechen</button>' : ''}
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                populatePersonaFormFields();
+                return;
+            }
 
             // 1. SETTINGS ANSICHT
             if (isSettingsActive) {
@@ -910,10 +1255,33 @@
                                         <h4>Standard-Modell (Engine)</h4>
                                         <p>Wähle das globale KI-Modell für neue Chats.</p>
                                     </div>
-                                    <select style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; font-weight:600;">
-                                        <option>StoryAI Ultra v2.5 (Empfohlen)</option>
-                                        <option>Roleplay-Claude</option>
-                                        <option>Llama-3-70B</option>
+                                    <select id="settingsModel" onchange="setSetting('model', this.value)" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; font-weight:600;">
+                                        <option value="StoryAI Ultra v2.5" ${settings.model === 'StoryAI Ultra v2.5' ? 'selected' : ''}>StoryAI Ultra v2.5 (Empfohlen)</option>
+                                        <option value="Roleplay-Claude" ${settings.model === 'Roleplay-Claude' ? 'selected' : ''}>Roleplay-Claude</option>
+                                        <option value="Llama-3-70B" ${settings.model === 'Llama-3-70B' ? 'selected' : ''}>Llama-3-70B</option>
+                                    </select>
+                                </div>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Test Size</h4>
+                                        <p>Wähle die gewünschte Antwortlänge für die KI.</p>
+                                    </div>
+                                    <select id="settingsTextSize" onchange="setSetting('textSize', this.value)" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; font-weight:600;">
+                                        <option value="Short" ${settings.textSize === 'Short' ? 'selected' : ''}>Short</option>
+                                        <option value="Middle" ${settings.textSize === 'Middle' ? 'selected' : ''}>Middle</option>
+                                        <option value="Long" ${settings.textSize === 'Long' ? 'selected' : ''}>Long</option>
+                                    </select>
+                                </div>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Language</h4>
+                                        <p>Wähle die Sprache für die KI-Antworten.</p>
+                                    </div>
+                                    <select id="settingsLanguage" onchange="setSetting('language', this.value)" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; font-weight:600;">
+                                        <option value="English" ${settings.language === 'English' ? 'selected' : ''}>English</option>
+                                        <option value="German" ${settings.language === 'German' ? 'selected' : ''}>German</option>
+                                        <option value="Spanish" ${settings.language === 'Spanish' ? 'selected' : ''}>Spanish</option>
+                                        <option value="French" ${settings.language === 'French' ? 'selected' : ''}>French</option>
                                     </select>
                                 </div>
                                 <div class="settings-row">
@@ -966,7 +1334,12 @@
                 filteredItems.sort((a, b) => a.name.localeCompare(b.name));
 
                 const gridHTML = filteredItems.map(item => {
-                    let typeLabel = item.type === 'character' ? 'Charakter' : item.type === 'world' ? 'Welt' : 'Story';
+                    const isStory = item.type === 'story';
+                    const typeLabel = isStory ? `💬: ${getStoryMessageCount(item.id)}` : item.type === 'character' ? 'Charakter' : 'Welt';
+                    const actionLabel = isStory ? 'Continue' : 'Play';
+                    const actionHandler = isStory
+                        ? `event.stopPropagation(); window.location.href='Character/GameCharacter.html?id=${item.id}'`
+                        : `event.stopPropagation(); createStoryFromCharacter(${item.id})`;
                     return `
                         <div class="lib-card animate-in" onclick="openDetail(${item.id})">
                             <div class="card-badge">${typeLabel}</div>
@@ -985,7 +1358,7 @@
                                 <div class="card-desc">${item.description}</div>
                                 <div class="card-footer">
                                     <div class="card-actions">
-                                        <button class="card-btn card-btn-play" onclick="event.stopPropagation(); window.location.href='GameCharacter.html?id=${item.id}'">Play</button>
+                                        <button class="card-btn card-btn-play" onclick="${actionHandler}">${actionLabel}</button>
                                         <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); window.location.href='Character/CreateCharacter.html?id=${item.id}'">Edit</button>
                                     </div>
                                 </div>
