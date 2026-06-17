@@ -908,8 +908,11 @@
 
         function getFilteredItems() {
             return items.filter(item => {
-                const matchesFilter = currentFilter === 'all' ||
-                                      (currentFilter === 'favorite' ? item.favorite : item.type === currentFilter);
+                const matchesFilter = currentFilter === 'all'
+                    ? item.type !== 'story'
+                    : currentFilter === 'favorite'
+                        ? item.favorite
+                        : item.type === currentFilter;
                 const matchesSearch = item.name.toLowerCase().includes(searchQuery) || item.description.toLowerCase().includes(searchQuery);
                 return matchesFilter && matchesSearch;
             }).sort((a, b) => a.name.localeCompare(b.name));
