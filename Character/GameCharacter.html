@@ -249,16 +249,6 @@
             font-size: 1.05rem;
         }
 
-        .engine-badge {
-            background: rgba(99, 102, 241, 0.12);
-            border: 1px solid rgba(99, 102, 241, 0.25);
-            color: #a5b4fc;
-            padding: 4px 10px;
-            border-radius: 8px;
-            font-size: 0.75rem;
-            font-weight: 600;
-        }
-
         .topbar-actions-right {
             display: flex;
             gap: 10px;
@@ -447,6 +437,140 @@
             filter: none;
         }
 
+        .persona-switcher {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            min-width: 160px;
+            max-width: 240px;
+        }
+
+        .persona-selector-btn {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #fff;
+            padding: 12px 14px;
+            border-radius: 16px;
+            min-width: 140px;
+            text-align: left;
+            cursor: pointer;
+            font-weight: 600;
+            transition: var(--transition);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .persona-selector-btn:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .persona-menu {
+            position: absolute;
+            bottom: calc(100% + 8px);
+            top: auto;
+            left: 0;
+            right: 0;
+            background: rgba(10, 10, 16, 0.98);
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 24px 60px rgba(0,0,0,0.35);
+            backdrop-filter: blur(20px);
+            border-radius: 20px;
+            z-index: 10;
+            overflow: hidden;
+            max-height: 320px;
+        }
+
+        .persona-search-input {
+            width: 100%;
+            padding: 12px 14px;
+            border: none;
+            outline: none;
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            font-size: 0.95rem;
+        }
+
+        .persona-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            max-height: 240px;
+            overflow-y: auto;
+        }
+
+        .persona-list-item {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: #fff;
+            padding: 12px 14px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            transition: background 0.2s ease;
+        }
+
+        .persona-list-item:hover,
+        .persona-list-item.selected {
+            background: rgba(99,102,241,0.12);
+        }
+
+        .persona-list-item.no-cover {
+            justify-content: center;
+        }
+
+        .persona-list-item.no-cover .persona-label {
+            text-align: center;
+            width: 100%;
+        }
+
+        .persona-preview {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+        }
+
+        .persona-cover {
+            width: 38px;
+            height: 38px;
+            border-radius: 12px;
+            background-size: cover;
+            background-position: center;
+            border: 1px solid rgba(255,255,255,0.08);
+            flex-shrink: 0;
+        }
+
+        .persona-label {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+        }
+
+        .persona-label strong {
+            font-size: 0.92rem;
+        }
+
+        .persona-label small {
+            color: #cbd5e1;
+            font-size: 0.78rem;
+            display: block;
+            line-height: 1.3;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .persona-menu-empty {
+            padding: 18px 14px;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
         .typing-indicator {
             align-self: flex-start;
             background: rgba(24, 24, 36, 0.6);
@@ -493,7 +617,7 @@
     <div class="chat-container">
         <aside class="char-sidebar">
             <div class="sidebar-header">
-                <a href="index.html" class="back-hub-btn">
+                <a href="../index.html" class="back-hub-btn">
                     <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
                     Hub verlassen
                 </a>
@@ -525,7 +649,6 @@
                     <div class="topbar-avatar" id="topbarAvatar"></div>
                     <div>
                         <div class="topbar-char-name" id="topbarName">Name</div>
-                        <div class="engine-badge" id="topbarEngine">Engine</div>
                     </div>
                 </div>
                 <div class="topbar-actions-right">
@@ -545,6 +668,13 @@
 
             <section class="bottom-input-pane">
                 <div class="input-glow-container">
+                    <div class="persona-switcher">
+                        <button type="button" class="persona-selector-btn" id="personaSelectBtn" onclick="togglePersonaMenu(event)">Persona wählen</button>
+                        <div class="persona-menu" id="personaMenu" style="display: none;">
+                            <input id="personaSearchInput" class="persona-search-input" placeholder="Suche Personas..." oninput="updatePersonaSearch(event)">
+                            <div class="persona-list" id="personaList"></div>
+                        </div>
+                    </div>
                     <textarea 
                         id="chatInput" 
                         class="chat-textarea" 
@@ -564,22 +694,47 @@
     <script>
         const STORAGE_KEY = 'storyAI_items';
         const CHAT_HISTORY_PREFIX = 'storyAI_chat_';
+        const SETTINGS_KEY = 'storyAI_settings';
+        const PERSONA_KEY = 'storyAI_personas';
+        const SELECTED_PERSONA_KEY = 'storyAI_selected_persona';
         
         let currentCharacter = null;
         let chatHistory = [];
+        let personas = [];
+        let selectedPersona = null;
+        let personaSearchQuery = '';
+        let isPersonaMenuOpen = false;
         let isWaitingForAI = false;
+        let settings = {
+            textSize: 'Middle',
+            language: 'English',
+            model: 'StoryAI Ultra v2.5'
+        };
+
+        function loadStoredSettings() {
+            try {
+                return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || {};
+            } catch (err) {
+                console.warn('Fehler beim Laden gespeicherter Einstellungen:', err);
+                return {};
+            }
+        }
 
         function initChatPage() {
+            settings = { ...settings, ...loadStoredSettings() };
             const urlParams = new URLSearchParams(window.location.search);
-            const charId = parseInt(urlParams.get('id'));
+            const charId = parseInt(urlParams.get('id')); 
 
             let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            
+            const selectedPersonaId = parseInt(localStorage.getItem(SELECTED_PERSONA_KEY), 10) || null;
+            personas = JSON.parse(localStorage.getItem(PERSONA_KEY) || '[]');
+            selectedPersona = personas.find(p => p.id === selectedPersonaId) || null;
+
             currentCharacter = items.find(i => i.id === charId);
 
             if (!currentCharacter) {
                 alert("Kein aktiver Charakter ausgewählt! Leite zurück zum Hub.");
-                window.location.href = 'index.html';
+                window.location.href = '../index.html';
                 return;
             }
 
@@ -593,13 +748,23 @@
             document.getElementById('topbarName').innerText = currentCharacter.name;
             document.getElementById('sidebarSubtitle').innerText = currentCharacter.subtitle;
             document.getElementById('sidebarLore').innerText = currentCharacter.description;
-            document.getElementById('topbarEngine').innerText = currentCharacter.engine || 'StoryAI Ultra';
 
             const tagsContainer = document.getElementById('sidebarTags');
             tagsContainer.innerHTML = (currentCharacter.tags || []).map(tag => `
                 <span class="sidebar-tag">${tag}</span>
             `).join('');
 
+            updatePersonaButton();
+            renderPersonaMenu();
+            document.body.addEventListener('click', closePersonaMenu);
+            const personaMenu = document.getElementById('personaMenu');
+            if (personaMenu) {
+                personaMenu.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                });
+            }
+            updatePersonaButton();
+            renderPersonaMenu();
             loadChatHistory();
         }
 
@@ -627,6 +792,75 @@
             localStorage.setItem(CHAT_HISTORY_PREFIX + currentCharacter.id, JSON.stringify(chatHistory));
         }
 
+        function updatePersonaButton() {
+            const btn = document.getElementById('personaSelectBtn');
+            if (!btn) return;
+            btn.innerText = selectedPersona ? selectedPersona.name : 'Persona wählen';
+        }
+
+        function togglePersonaMenu(event) {
+            if (event) event.stopPropagation();
+            isPersonaMenuOpen = !isPersonaMenuOpen;
+            renderPersonaMenu();
+        }
+
+        function closePersonaMenu() {
+            isPersonaMenuOpen = false;
+            renderPersonaMenu();
+        }
+
+        function updatePersonaSearch(event) {
+            personaSearchQuery = event.target.value.toLowerCase();
+            renderPersonaMenu();
+        }
+
+        function selectPersona(id) {
+            selectedPersona = personas.find(p => p.id === id) || null;
+            if (selectedPersona) {
+                localStorage.setItem(SELECTED_PERSONA_KEY, id.toString());
+            } else {
+                localStorage.removeItem(SELECTED_PERSONA_KEY);
+            }
+            isPersonaMenuOpen = false;
+            updatePersonaButton();
+            renderPersonaMenu();
+        }
+
+        function renderPersonaMenu() {
+            const menu = document.getElementById('personaMenu');
+            const list = document.getElementById('personaList');
+            const searchInput = document.getElementById('personaSearchInput');
+            if (!menu || !list || !searchInput) return;
+
+            menu.style.display = isPersonaMenuOpen ? 'block' : 'none';
+            searchInput.value = personaSearchQuery;
+
+            const sortedPersonas = [...personas]
+                .filter(persona => !selectedPersona || persona.id !== selectedPersona.id)
+                .sort((a, b) => a.name.localeCompare(b.name));
+
+            const filteredPersonas = sortedPersonas.filter(persona => {
+                const searchText = `${persona.name}`.toLowerCase();
+                return searchText.includes(personaSearchQuery);
+            });
+
+            list.innerHTML = filteredPersonas.length ? filteredPersonas.map(persona => {
+                const hasCover = Boolean(persona.cover);
+                return `
+                    <button type="button" class="persona-list-item ${hasCover ? '' : 'no-cover'}" onclick="selectPersona(${persona.id})">
+                        ${hasCover ? `
+                            <span class="persona-preview">
+                                <span class="persona-cover" style="background-image: url('${persona.cover}')"></span>
+                                <span class="persona-label"><strong>${persona.name}</strong></span>
+                            </span>
+                        ` : `
+                            <span class="persona-label"><strong>${persona.name}</strong></span>
+                        `}
+                    </button>
+                `;
+            }).join('') : '<div class="persona-menu-empty">Keine Personas gefunden. Lege eine Persona im Hub an.</div>';
+        }
+
         function renderChatLog() {
             const logArea = document.getElementById('storyLog');
             
@@ -650,13 +884,32 @@
 
         function buildAIPrompt() {
             // Construct a prompt context based on character info and chat history
-            let prompt = `You are roleplaying as a character named ${currentCharacter.name}. `;
-            prompt += `Your description: ${currentCharacter.description} `;
-            if(currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance} `;
-            if(currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality} `;
-            
-            prompt += `\n\nRespond in character. Use asterisks like *this* to describe actions or expressions.\n\n`;
-            
+            let prompt = `You are roleplaying as a character named ${currentCharacter.name}.\n`;
+            prompt += `Name: ${currentCharacter.name}.\n`;
+            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
+            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
+            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.\n`;
+            if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
+                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
+            }
+            prompt += `Description: ${currentCharacter.description}.\n`;
+
+            const textSizeInstruction = settings.textSize === 'Short'
+                ? 'Keep replies short and concise.'
+                : settings.textSize === 'Long'
+                    ? 'Use longer, more detailed replies.'
+                    : 'Use moderate response length.';
+            const languageInstruction = settings.language === 'German'
+                ? 'Antworten auf Deutsch.'
+                : settings.language === 'Spanish'
+                    ? 'Responde en español.'
+                    : settings.language === 'French'
+                        ? 'Répondre en français.'
+                        : 'Answer in English.';
+
+            prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
+            prompt += `Respond in character. Use asterisks like *this* to describe actions or expressions.\n\n`;
+
             // Add conversation history
             const contextLimit = 10; // Only send last few messages to save context/time
             const recentHistory = chatHistory.slice(-contextLimit);
@@ -675,8 +928,30 @@
 
         async function generateInitialGreeting() {
             setLoadingState(true);
+            const textSizeInstruction = settings.textSize === 'Short'
+                ? 'Keep replies short and concise.'
+                : settings.textSize === 'Long'
+                    ? 'Use longer, more detailed replies.'
+                    : 'Use moderate response length.';
+            const languageInstruction = settings.language === 'German'
+                ? 'Antworten auf Deutsch.'
+                : settings.language === 'Spanish'
+                    ? 'Responde en español.'
+                    : settings.language === 'French'
+                        ? 'Répondre en français.'
+                        : 'Answer in English.';
             
-            const prompt = `You are a character named ${currentCharacter.name}. Description: ${currentCharacter.description}. Write an introductory greeting for a roleplay. Include actions in asterisks.`;
+            let prompt = `You are roleplaying as a character named ${currentCharacter.name}.\n`;
+            prompt += `Name: ${currentCharacter.name}.\n`;
+            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
+            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
+            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.\n`;
+            if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
+                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
+            }
+            prompt += `Description: ${currentCharacter.description}.\n`;
+            prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
+            prompt += `Write an introductory greeting for a roleplay. Include actions in asterisks. Respond in character.`;
             
             try {
                 const responseText = await perchanceBridge.generateText(prompt, ['User:']);
