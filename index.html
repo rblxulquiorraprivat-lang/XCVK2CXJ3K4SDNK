@@ -5,23 +5,28 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Premium Hub Dashboard</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
         * {
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
         }
 
         :root {
-            --bg-main: #0b0c10;
-            --bg-sidebar: #131520;
-            --bg-card: #1f2335;
-            --bg-accent: #2e3456;
-            --text-main: #f5f6fa;
-            --text-muted: #9aa5ce;
+            --bg-main: #09090b;
+            --bg-sidebar: #121214;
+            --bg-card: #1c1c1f;
+            --bg-card-hover: #27272a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
             --border-color: rgba(255, 255, 255, 0.08);
             --color-primary: #6366f1;
-            --color-success: #10b981;
+            --color-primary-glow: rgba(99, 102, 241, 0.4);
+            --color-secondary: #8b5cf6;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            --color-favorite: #eab308;
         }
 
         body {
@@ -30,12 +35,22 @@
             height: 100vh;
             display: flex;
             overflow: hidden;
+            background-image: 
+                radial-gradient(circle at 15% 50%, rgba(99, 102, 241, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 30%, rgba(139, 92, 246, 0.05), transparent 25%);
         }
 
-        /* --- SIDEBAR LAYOUT --- */
+        /* --- SCROLLBAR --- */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 10px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        /* --- SIDEBAR (Zuletzt aktiv) --- */
         .sidebar {
-            width: 360px;
-            background-color: var(--bg-sidebar);
+            width: 320px;
+            background-color: rgba(18, 18, 20, 0.7);
+            backdrop-filter: blur(20px);
             border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
@@ -44,100 +59,193 @@
         }
 
         .sidebar-header {
-            padding: 20px;
+            padding: 24px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             border-bottom: 1px solid var(--border-color);
         }
 
-        .sidebar-header h1 {
-            font-size: 1.6rem;
-            font-weight: 800;
-            background: linear-gradient(90deg, #ffffff, #a5b4fc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 1px;
-            cursor: pointer;
+        .sidebar-brand-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
 
-        .header-actions {
+        .sidebar-header h1 {
+            font-size: 1.5rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff, #a5b4fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            cursor: pointer;
+            letter-spacing: -0.5px;
+        }
+
+        /* Zahnrad Einstellungen Button */
+        .settings-icon-btn {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
             display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            color: var(--text-muted);
+            transition: var(--transition);
+        }
+
+        .settings-icon-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            transform: rotate(45deg);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .section-title {
+            padding: 24px 24px 12px;
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
             gap: 8px;
         }
 
-        .icon-btn {
-            background: rgba(255, 255, 255, 0.04);
-            border: 1px solid var(--border-color);
-            color: #fff;
-            width: 38px;
-            height: 38px;
+        .section-title::before {
+            content: '';
+            display: block;
+            width: 8px;
+            height: 8px;
+            background: var(--color-primary);
             border-radius: 50%;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            cursor: pointer;
-            transition: all 0.25s ease;
+            box-shadow: 0 0 10px var(--color-primary-glow);
         }
 
-        .icon-btn:hover {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: #a5b4fc;
-            transform: scale(1.05);
-        }
-
-        .sidebar-nav {
-            display: flex;
-            padding: 15px 15px 5px 15px;
-            gap: 6px;
-        }
-
-        .tab-btn {
+        .recent-list {
             flex: 1;
+            overflow-y: auto;
+            padding: 0 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .recent-item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
             background: rgba(255, 255, 255, 0.02);
-            border: 1px solid var(--border-color);
-            color: var(--text-muted);
-            padding: 10px 4px;
-            border-radius: 12px;
-            font-size: 0.78rem;
-            font-weight: 700;
+            border: 1px solid transparent;
+            border-radius: 16px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            text-align: center;
-            letter-spacing: 0.5px;
+            transition: var(--transition);
         }
 
-        .tab-btn.active {
-            background: rgba(99, 102, 241, 0.15);
-            color: #fff;
-            border-color: #6366f1;
+        .recent-item:hover {
+            background: var(--bg-card-hover);
+            border-color: rgba(255, 255, 255, 0.1);
+            transform: translateX(4px);
         }
 
-        .search-box {
-            padding: 15px 20px;
+        .recent-avatar {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            background-size: cover;
+            background-position: center;
+            margin-right: 14px;
             position: relative;
         }
 
-        .search-bar {
-            width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border-color);
-            padding: 12px 15px 12px 42px;
-            border-radius: 25px;
-            color: #fff;
-            font-size: 0.95rem;
-            outline: none;
-            transition: all 0.2s;
+        .recent-info {
+            flex: 1;
+            overflow: hidden;
         }
 
-        .search-bar:focus {
-            border-color: #6366f1;
-            background: rgba(0, 0, 0, 0.5);
+        .recent-name {
+            font-weight: 600;
+            font-size: 0.95rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: #fff;
+            margin-bottom: 2px;
+        }
+
+        .recent-time {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* --- DASHBOARD MAIN (Bibliothek) --- */
+        .dashboard-main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            position: relative;
+            padding: 40px;
+        }
+
+        /* Top Bar in Library */
+        .library-topbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+
+        .library-title h2 {
+            font-size: 2rem;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .library-title p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-top: 4px;
+        }
+
+        .topbar-actions {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .search-container {
+            position: relative;
+            width: 250px;
+        }
+
+        .search-container input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 12px 16px 12px 40px;
+            border-radius: 20px;
+            color: #fff;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .search-container input:focus {
+            outline: none;
+            border-color: var(--color-primary);
+            background: rgba(0, 0, 0, 0.2);
+            box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
         }
 
         .search-icon {
             position: absolute;
-            left: 35px;
+            left: 14px;
             top: 50%;
             transform: translateY(-50%);
             width: 16px;
@@ -145,574 +253,389 @@
             fill: var(--text-muted);
         }
 
-        .list-container {
-            flex: 1;
-            overflow-y: auto;
-            padding: 0 15px 20px 15px;
-        }
-
-        .create-item-btn {
-            width: 100%;
-            background: rgba(255,255,255,0.02);
-            border: 1px dashed rgba(255,255,255,0.2);
-            color: var(--text-muted);
-            padding: 14px;
-            border-radius: 15px;
-            cursor: pointer;
-            font-weight: 600;
-            margin-bottom: 15px;
-            transition: all 0.2s;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .create-item-btn:hover {
-            border-color: #6366f1;
-            color: #fff;
-            background: rgba(99, 102, 241, 0.05);
-        }
-
-        .chat-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            background: rgba(255, 255, 255, 0.02);
-            border: 1px solid transparent;
-            border-radius: 16px;
-            margin-bottom: 10px;
-            cursor: pointer;
-            transition: all 0.25s ease;
-            position: relative;
-        }
-
-        .chat-item:hover {
-            background: rgba(255, 255, 255, 0.06);
-            transform: translateY(-2px);
-        }
-
-        .chat-item.active {
-            background: rgba(255, 255, 255, 0.08);
-            border-color: rgba(255, 255, 255, 0.15);
-        }
-
-        .avatar {
-            width: 50px;
-            height: 50px;
-            border-radius: 12px;
-            background-size: cover;
-            background-position: center;
-            margin-right: 15px;
-            border: 1px solid rgba(255,255,255,0.1);
-            flex-shrink: 0;
-        }
-
-        .item-info {
-            flex: 1;
-            overflow: hidden;
-        }
-
-        .item-name-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
-
-        .item-name {
-            font-weight: 700;
-            font-size: 1rem;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .item-meta {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .item-subtitle {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .color-indicator {
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-left: 6px;
-        }
-
-        .item-actions {
-            position: absolute;
-            right: 12px;
-            bottom: 12px;
-            display: flex;
-            gap: 6px;
-            opacity: 0;
-            transition: opacity 0.2s ease;
-        }
-
-        .chat-item:hover .item-actions {
-            opacity: 1;
-        }
-
-        .mini-btn {
-            background: #24283d;
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #fff;
-            padding: 4px 8px;
-            border-radius: 6px;
-            font-size: 0.75rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        .mini-btn:hover {
-            background: #343b58;
-            border-color: #a5b4fc;
-        }
-
-        /* --- DASHBOARD MAIN LAYOUT --- */
-        .dashboard-main {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--bg-main);
-            overflow-y: auto;
-            position: relative;
-        }
-
-        /* Schwebender Zurück-Button */
-        .back-to-hub-btn {
-            position: absolute;
-            top: 25px;
-            left: 40px;
-            z-index: 10;
-            background: rgba(11, 12, 16, 0.6);
-            border: 1px solid rgba(255,255,255,0.15);
-            backdrop-filter: blur(8px);
-            color: #fff;
-            padding: 10px 18px;
-            border-radius: 30px;
-            font-size: 0.9rem;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s ease;
-        }
-
-        .back-to-hub-btn:hover {
-            background: #fff;
-            color: #000;
-            transform: translateX(-3px);
-        }
-
-        /* Dashboard Banner / Hero Section */
-        .hero-banner {
-            height: 250px;
-            background: linear-gradient(180deg, rgba(19, 21, 32, 0.4) 0%, var(--bg-main) 100%), radial-gradient(circle at top right, rgba(99, 102, 241, 0.15), transparent);
-            display: flex;
-            align-items: flex-end;
-            padding: 30px 40px;
-            border-bottom: 1px solid var(--border-color);
-            position: relative;
-        }
-
-        .hero-profile {
-            display: flex;
-            align-items: center;
-            gap: 25px;
-            z-index: 2;
-            margin-top: 40px;
-        }
-
-        .hero-avatar {
-            width: 110px;
-            height: 110px;
-            border-radius: 20px;
-            border: 2px solid rgba(255, 255, 255, 0.2);
-            box-shadow: 0 8px 25px rgba(0,0,0,0.5);
-            background-size: cover;
-            background-position: center;
-        }
-
-        .hero-details h2 {
-            font-size: 2rem;
-            font-weight: 800;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .hero-details p {
-            color: var(--text-muted);
-            font-size: 1rem;
-        }
-
-        /* Dashboard Content Grid */
-        .dashboard-content {
-            padding: 40px;
-            display: grid;
-            grid-template-columns: 2fr 1fr;
-            gap: 30px;
-            max-width: 1400px;
-            width: 100%;
-            margin: 0 auto;
-        }
-
-        .content-panel {
-            background: var(--bg-sidebar);
-            border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 25px;
-        }
-
-        .panel-title {
-            font-size: 1.1rem;
-            font-weight: 700;
-            margin-bottom: 15px;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-            padding-bottom: 10px;
-        }
-
-        .description-box {
-            color: #d5d9ec;
-            line-height: 1.6;
-            font-size: 1rem;
-        }
-
-        /* Metadaten Grid */
-        .meta-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 15px;
-            margin-top: 20px;
-        }
-
-        .meta-card {
-            background: rgba(255,255,255,0.02);
-            border: 1px solid var(--border-color);
-            padding: 12px 15px;
-            border-radius: 12px;
-        }
-
-        .meta-label {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            margin-bottom: 4px;
-            font-weight: 600;
-        }
-
-        .meta-value {
-            font-size: 0.95rem;
-            font-weight: 700;
-            color: #fff;
-        }
-
-        /* Quick Action Spalte rechts */
-        .actions-sidebar {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-
-        .launch-btn {
-            background: var(--color-primary);
+        .create-btn {
+            background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
             color: #fff;
             border: none;
-            padding: 18px;
-            border-radius: 16px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 4px 20px rgba(99, 102, 241, 0.3);
-            transition: all 0.2s ease;
-            text-decoration: none;
-        }
-
-        .launch-btn:hover {
-            filter: brightness(1.15);
-            transform: translateY(-2px);
-        }
-
-        .launch-btn svg {
-            width: 20px;
-            height: 20px;
-            fill: currentColor;
-        }
-
-        .secondary-action-btn {
-            background: rgba(255,255,255,0.03);
-            border: 1px solid var(--border-color);
-            color: #fff;
-            padding: 12px;
-            border-radius: 12px;
+            padding: 12px 24px;
+            border-radius: 20px;
             font-weight: 600;
+            font-size: 0.95rem;
             cursor: pointer;
-            transition: all 0.2s;
-            text-align: center;
-            font-size: 0.9rem;
-        }
-
-        .secondary-action-btn:hover {
-            background: rgba(255,255,255,0.08);
-            border-color: #a5b4fc;
-        }
-
-        .tag-list {
+            transition: var(--transition);
             display: flex;
-            flex-wrap: wrap;
+            align-items: center;
             gap: 8px;
-            margin-top: 15px;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
         }
 
-        .tag-badge {
-            background: rgba(99, 102, 241, 0.12);
-            color: #a5b4fc;
-            padding: 4px 10px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            border: 1px solid rgba(99, 102, 241, 0.2);
+        .create-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
         }
 
-        /* --- NEW MAIN MENU HUB LAYOUT (LATEST, POPULAR, RANDOM) --- */
-        .hub-container {
-            padding: 40px;
-            max-width: 1400px;
-            width: 100%;
-            margin: 0 auto;
-        }
-
-        .hub-welcome-banner {
-            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
-            border: 1px solid rgba(99, 102, 241, 0.2);
-            padding: 35px;
-            border-radius: 24px;
-            margin-bottom: 40px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-        }
-
-        .hub-welcome-banner h2 {
-            font-size: 2.2rem;
-            font-weight: 800;
-            margin-bottom: 8px;
-            background: linear-gradient(90deg, #fff, #c7d2fe);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .hub-welcome-banner p {
-            color: var(--text-muted);
-            font-size: 1.1rem;
-        }
-
-        .hub-section {
-            margin-bottom: 45px;
-        }
-
-        .hub-section-title {
-            font-size: 1.4rem;
-            font-weight: 800;
-            margin-bottom: 20px;
+        /* Filter Tabs */
+        .filter-tabs {
             display: flex;
-            align-items: center;
             gap: 10px;
-            letter-spacing: 0.5px;
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.02);
+            padding: 6px;
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+            width: fit-content;
         }
 
-        .hub-grid {
+        .filter-tab {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            padding: 10px 20px;
+            border-radius: 14px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .filter-tab:hover {
+            color: #fff;
+        }
+
+        .filter-tab.active {
+            background: rgba(255, 255, 255, 0.1);
+            color: #fff;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        /* Grid */
+        .library-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-            gap: 20px;
+            gap: 24px;
+            padding-bottom: 40px;
         }
 
-        .hub-card {
-            background: var(--bg-sidebar);
+        .lib-card {
+            background: var(--bg-card);
             border: 1px solid var(--border-color);
-            border-radius: 20px;
-            padding: 20px;
-            cursor: pointer;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-            position: relative;
+            border-radius: 24px;
             overflow: hidden;
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
             display: flex;
             flex-direction: column;
-            gap: 14px;
         }
 
-        .hub-card:hover {
-            transform: translateY(-5px);
-            border-color: rgba(255,255,255,0.2);
-            background: rgba(255,255,255,0.03);
-            box-shadow: 0 12px 30px rgba(0,0,0,0.4);
+        .lib-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(255, 255, 255, 0.2);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.4);
         }
 
-        .hub-card-top {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-        }
-
-        .hub-card-avatar {
-            width: 60px;
-            height: 60px;
-            border-radius: 14px;
+        .card-cover {
+            height: 140px;
             background-size: cover;
             background-position: center;
-            border: 1px solid rgba(255,255,255,0.1);
+            position: relative;
         }
 
-        .hub-card-meta {
+        .card-cover::after {
+            content: '';
             position: absolute;
-            top: 15px;
-            right: 20px;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 60px;
+            background: linear-gradient(to top, var(--bg-card), transparent);
+        }
+
+        .card-badge {
+            position: absolute;
+            top: 12px;
+            left: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            padding: 4px 10px;
+            border-radius: 10px;
             font-size: 0.7rem;
             font-weight: 700;
             text-transform: uppercase;
-            padding: 3px 8px;
-            border-radius: 6px;
-            background: rgba(255,255,255,0.05);
-            color: var(--text-muted);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.1);
+            z-index: 5;
         }
 
-        .hub-card-body h4 {
-            font-size: 1.1rem;
+        /* Favoriten Stern Button */
+        .card-favorite-btn {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.1);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 5;
+            color: var(--text-muted);
+            transition: var(--transition);
+        }
+
+        .card-favorite-btn:hover {
+            transform: scale(1.1);
+            background: rgba(0, 0, 0, 0.8);
+        }
+
+        .card-favorite-btn.is-favorite {
+            color: var(--color-favorite);
+            border-color: rgba(234, 179, 8, 0.3);
+        }
+
+        .card-body {
+            padding: 20px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .card-title {
+            font-size: 1.2rem;
             font-weight: 700;
-            color: #fff;
             margin-bottom: 4px;
             display: flex;
             align-items: center;
-            gap: 6px;
+            gap: 8px;
         }
 
-        .hub-card-body p {
+        .color-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+        }
+
+        .card-subtitle {
             font-size: 0.85rem;
+            color: var(--color-primary);
+            margin-bottom: 12px;
+            font-weight: 600;
+        }
+
+        .card-desc {
+            font-size: 0.9rem;
             color: var(--text-muted);
-            line-height: 1.4;
+            line-height: 1.5;
             display: -webkit-box;
             -webkit-line-clamp: 2;
             -webkit-box-orient: vertical;
             overflow: hidden;
+            margin-bottom: 15px;
         }
 
-        /* Modals */
-        .modal-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: rgba(0,0,0,0.7);
-            backdrop-filter: blur(4px);
-            z-index: 100;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            opacity: 0;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
-        }
-
-        .modal-overlay.open {
-            opacity: 1;
-            pointer-events: auto;
-        }
-
-        .modal-content {
-            background: #1a1d2e;
-            border: 1px solid rgba(255,255,255,0.1);
-            width: 100%;
-            max-width: 460px;
-            border-radius: 24px;
-            padding: 30px;
-            box-shadow: 0 20px 50px rgba(0,0,0,0.6);
-            transform: translateY(20px);
-            transition: transform 0.3s ease;
-        }
-
-        .modal-overlay.open .modal-content {
-            transform: translateY(0);
-        }
-
-        .modal-header {
+        .card-footer {
+            margin-top: auto;
+            padding-top: 15px;
+            border-top: 1px solid rgba(255,255,255,0.05);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            margin-bottom: 25px;
         }
 
-        .modal-header h3 {
-            font-size: 1.3rem;
-            font-weight: 700;
+        /* Play & Edit Buttons Layout */
+        .card-actions {
+            display: flex;
+            gap: 8px;
+            width: 100%;
         }
 
-        .close-modal {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.5rem;
-            cursor: pointer;
-        }
-
-        .form-group {
-            margin-bottom: 20px;
-        }
-
-        .form-group label {
-            display: block;
+        .card-btn {
+            flex: 1;
+            padding: 8px 12px;
+            border-radius: 10px;
             font-size: 0.85rem;
             font-weight: 600;
-            color: var(--text-muted);
-            margin-bottom: 8px;
-            text-transform: uppercase;
-        }
-
-        .form-control {
-            width: 100%;
-            background: rgba(0,0,0,0.3);
-            border: 1px solid var(--border-color);
-            padding: 12px 16px;
-            border-radius: 12px;
-            color: #fff;
-            font-size: 1rem;
-            outline: none;
-        }
-
-        .submit-btn {
-            width: 100%;
-            padding: 14px;
-            border-radius: 12px;
-            border: none;
-            background: #6366f1;
-            color: #fff;
-            font-weight: 700;
-            font-size: 1rem;
             cursor: pointer;
-            transition: background 0.2s;
+            transition: var(--transition);
+            text-align: center;
+            border: 1px solid transparent;
         }
 
-        .submit-btn:hover {
+        .card-btn-play {
+            background: var(--color-primary);
+            color: #fff;
+        }
+
+        .card-btn-play:hover {
             background: #4f46e5;
+            box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+        }
+
+        .card-btn-edit {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border-color);
+            color: var(--text-main);
+        }
+
+        .card-btn-edit:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        /* --- DETAIL & SETTINGS VIEW --- */
+        .back-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 30px;
+            width: fit-content;
+            transition: var(--transition);
+        }
+
+        .back-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(-4px);
+        }
+
+        .detail-hero {
+            display: flex;
+            gap: 30px;
+            margin-bottom: 40px;
+            align-items: flex-end;
+        }
+
+        .detail-avatar {
+            width: 160px;
+            height: 160px;
+            border-radius: 30px;
+            background-size: cover;
+            background-position: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            border: 2px solid rgba(255,255,255,0.1);
+        }
+
+        .detail-info h1 {
+            font-size: 2.5rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+
+        .detail-info p {
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 30px;
+        }
+
+        .detail-panel {
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 30px;
+        }
+
+        .detail-panel h3 {
+            font-size: 1.1rem;
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 20px;
+        }
+
+        .tag {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.8rem;
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-btn-large {
+            width: 100%;
+            background: var(--color-primary);
+            color: #fff;
+            border: none;
+            padding: 16px;
+            border-radius: 16px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            margin-bottom: 15px;
+            transition: var(--transition);
+            box-shadow: 0 4px 20px var(--color-primary-glow);
+        }
+
+        .action-btn-large:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        /* Settings spezifische Styles */
+        .settings-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .settings-row:last-child { border-bottom: none; }
+        .settings-row-info h4 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+        .settings-row-info p { font-size: 0.85rem; color: var(--text-muted); }
+
+        /* Fake Switch Toggle */
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 24px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #27272a; transition: .4s; border-radius: 24px;
+            border: 1px solid var(--border-color);
+        }
+        .slider:before {
+            position: absolute; content: ""; height: 16px; width: 16px; left: 3px; bottom: 3px;
+            background-color: white; transition: .4s; border-radius: 50%;
+        }
+        input:checked + .slider { background-color: var(--color-primary); }
+        input:checked + .slider:before { transform: translateX(20px); }
+
+        /* Animation */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+            animation: fadeIn 0.4s ease forwards;
         }
     </style>
 </head>
@@ -720,415 +643,435 @@
 
     <aside class="sidebar">
         <div class="sidebar-header">
-            <h1 onclick="goBackToMenu()">Story AI</h1>
-            <div class="header-actions">
-                <button class="icon-btn" title="Sync Cloud"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96zM17 13l-5 5-5-5h3V9h4v4h3z"/></svg></button>
-                <button class="icon-btn settings-btn" title="Settings" onclick="toggleModal('settingsModal', true)"><svg viewBox="0 0 24 24" style="width:18px;height:18px;fill:currentColor;"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.06-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.73,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.06,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.43-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.49-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg></button>
+            <div class="sidebar-brand-wrapper">
+                <h1 onclick="goBackToLibrary()">Story AI</h1>
+                <button class="settings-icon-btn" onclick="openSettings()" title="Einstellungen">
+                    <svg viewBox="0 0 24 24" style="width: 18px; height: 18px; fill: currentColor;">
+                        <path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l-.38 2.65c-.03.24.17.42.42.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61-.22l2-3.46c.12-.22.07-.49-.12-.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"/>
+                    </svg>
+                </button>
             </div>
         </div>
-
-        <div class="sidebar-nav">
-            <button class="tab-btn active" id="tab-chars" onclick="switchTab('characters')">CHARACTERS</button>
-            <button class="tab-btn" id="tab-worlds" onclick="switchTab('worlds')">WORLDS</button>
-            <button class="tab-btn" id="tab-stories" onclick="switchTab('stories')">STORIES</button>
+        <div class="section-title">Zuletzt aktiv</div>
+        <div class="recent-list" id="recentList">
         </div>
-
-        <div class="search-box">
-            <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-            <input type="text" class="search-bar" id="searchBar" placeholder="Suche nach Charakteren...">
-        </div>
-
-        <div class="list-container" id="listContainer"></div>
     </aside>
 
     <main class="dashboard-main" id="dashboardMain">
-        </main>
-
-    <div class="modal-overlay" id="editModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>Eintrag editieren</h3>
-                <button class="close-modal" onclick="toggleModal('editModal', false)">&times;</button>
-            </div>
-            <input type="hidden" id="editItemId">
-            <div class="form-group">
-                <label for="editName">Name / Titel</label>
-                <input type="text" id="editName" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="editSubtitle">Kurzbeschreibung</label>
-                <input type="text" id="editSubtitle" class="form-control">
-            </div>
-            <div class="form-group">
-                <label for="editDescription">Ausführliche Beschreibung / Lore</label>
-                <textarea id="editDescription" class="form-control" rows="4" style="resize:none; font-family:inherit;"></textarea>
-            </div>
-            <div class="form-group">
-                <label>Theme Farbe wählen</label>
-                <input type="color" id="editColor" class="form-control" style="height:40px; padding:2px; cursor:pointer;">
-            </div>
-            <button class="submit-btn" onclick="saveCharacterEdits()">Änderungen speichern</button>
-        </div>
-    </div>
-
-    <div class="modal-overlay" id="settingsModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3>⚙️ Globale Einstellungen</h3>
-                <button class="close-modal" onclick="toggleModal('settingsModal', false)">&times;</button>
-            </div>
-            <div class="form-group">
-                <label>KI-Modell Engine</label>
-                <select class="form-control" style="background:#000; color:#fff;">
-                    <option>StoryAI Ultra v2.5 (Standard)</option>
-                    <option>Roleplay-Claude-Specialist</option>
-                    <option>Llama-3-Fiction-70B</option>
-                </select>
-            </div>
-            <button class="submit-btn" onclick="toggleModal('settingsModal', false)">Einstellungen schließen</button>
-        </div>
-    </div>
+    </main>
 
     <script>
-        let currentTab = 'characters';
-        let activeId = null; // null bedeutet: Hauptmenü (Hub) anzeigen!
+        const STORAGE_KEY = 'storyAI_items';
 
-        // Erweiterte Datenbankstrukturen inklusive neuem "Stories"-System & Hub-Kategorisierung
         let items = [
             {
-                id: 1,
-                type: 'characters',
-                name: 'Konata Izumi',
-                subtitle: 'Anime Otaku • Fröhlich',
-                description: 'Konata ist eine extrem passionierte Otaku-Schülerin, die ihre Zeit am liebsten mit Video- und Online-Spielen, Anime und Light Novels verbringt. Sie ist sarkastisch, intelligent, aber extrem faul, wenn es um schulische Angelegenheiten geht.',
-                avatar: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80',
-                meta: 'Von: System',
-                color: '#ec4899',
-                engine: 'StoryAI Ultra v2.5',
-                tags: ['Anime', 'Otaku', 'Comedy', 'Gamer'],
-                hubGroup: 'popular'
+                id: 1, type: 'character', name: 'Konata Izumi', subtitle: 'Anime Otaku • Fröhlich',
+                description: 'Konata ist eine extrem passionierte Otaku-Schülerin, die ihre Zeit am liebsten mit Video- und Online-Spielen verbringt.',
+                avatar: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80',
+                color: '#ec4899', tags: ['Anime', 'Otaku', 'Comedy'], lastPlayed: Date.now() - 10000,
+                engine: 'StoryAI Ultra v2.5', favorite: false
             },
             {
-                id: 2,
-                type: 'characters',
-                name: 'Kotonoha Katsura',
-                subtitle: 'Schülerin • Schüchtern',
-                description: 'Kotonoha ist eine sanftmütige, höfliche und sehr schüchterne Oberschülerin aus einer wohlhabenden Familie. Sie liest leidenschaftlich gerne dicke Bücher und hat oft Schwierigkeiten, Anschluss an Gleichaltrige zu finden.',
-                avatar: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&auto=format&fit=crop&q=80',
-                meta: 'Von: System',
-                color: '#3b82f6',
-                engine: 'Roleplay-Claude-Specialist',
-                tags: ['Drama', 'Schülerin', 'Romance', 'Classic'],
-                hubGroup: 'random'
+                id: 2, type: 'character', name: 'Kotonoha Katsura', subtitle: 'Schülerin • Schüchtern',
+                description: 'Kotonoha ist eine sanftmütige, höfliche und sehr schüchterne Oberschülerin aus einer wohlhabenden Familie.',
+                avatar: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
+                color: '#3b82f6', tags: ['Drama', 'Schülerin', 'Romance'], lastPlayed: Date.now() - 50000,
+                engine: 'Roleplay-Claude', favorite: false
             },
             {
-                id: 3,
-                type: 'worlds',
-                name: 'Neo-Tokyo 2077',
-                subtitle: 'Cyberpunk RPG Hub',
-                description: 'Eine gigantische, von Neonlicht durchflutete Megacity der Zukunft. Konzerne kontrollieren das Leben, während im Untergrund Hacker, Fixer und Cyber-Söldner um das nackte Überleben kämpfen. Der Smog hängt tief, und die Straßen riechen nach billigem Ramen.',
-                avatar: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&auto=format&fit=crop&q=80',
-                meta: 'Von: ModderX',
-                color: '#10b981',
-                engine: 'Llama-3-Fiction-70B',
-                tags: ['Cyberpunk', 'Sci-Fi', 'Dystopie', 'Action'],
-                hubGroup: 'popular'
+                id: 3, type: 'world', name: 'Neo-Tokyo 2077', subtitle: 'Cyberpunk RPG Hub',
+                description: 'Eine gigantische, von Neonlicht durchflutete Megacity der Zukunft. Konzerne kontrollieren das Leben.',
+                avatar: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&q=80',
+                color: '#10b981', tags: ['Cyberpunk', 'Sci-Fi', 'Action'], lastPlayed: Date.now() - 120000,
+                engine: 'Llama-3-70B', favorite: false
             },
             {
-                id: 4,
-                type: 'stories',
-                name: 'Der letzte Funke',
-                subtitle: 'Sci-Fi • Interaktives Abenteuer',
-                description: 'Die Menschheit hat die fernen Sterne erreicht, doch die Zentral-Sonne deines Sektors stirbt unaufhaltsam. Du spielst den Kommandanten des letzten Hoffnungsschiffs auf einer Mission ohne Wiederkehr in den interstellaren Abgrund.',
-                avatar: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&auto=format&fit=crop&q=80',
-                meta: 'Von: AI-Writer',
-                color: '#8b5cf6',
-                engine: 'StoryAI Ultra v2.5',
-                tags: ['Sci-Fi', 'Weltall', 'Drama', 'Interactive'],
-                hubGroup: 'latest'
+                id: 4, type: 'story', name: 'Der letzte Funke', subtitle: 'Sci-Fi • Interaktives Abenteuer',
+                description: 'Die Menschheit hat die fernen Sterne erreicht, doch die Zentral-Sonne deines Sektors stirbt unaufhaltsam.',
+                avatar: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&q=80',
+                color: '#8b5cf6', tags: ['Sci-Fi', 'Weltall', 'Drama'], lastPlayed: Date.now() - 5000,
+                engine: 'StoryAI Ultra v2.5', favorite: false
             },
             {
-                id: 5,
-                type: 'stories',
-                name: 'Schatten über Dunwall',
-                subtitle: 'Dark Fantasy • Mystery',
-                description: 'In den nebligen Gassen einer viktorianischen Küstenstadt geht eine unheimliche Magie um. Ermittle in einer Serie von rituellen Diebstählen und decke Verschwörungen auf, die bis in den königlichen Hof reichen.',
-                avatar: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&auto=format&fit=crop&q=80',
-                meta: 'Von: GothicFan',
-                color: '#f59e0b',
-                engine: 'Llama-3-Fiction-70B',
-                tags: ['Fantasy', 'Steampunk', 'Magie', 'Detektiv'],
-                hubGroup: 'latest'
+                id: 5, type: 'story', name: 'Schatten über Dunwall', subtitle: 'Dark Fantasy • Mystery',
+                description: 'In den nebligen Gassen einer viktorianischen Küstenstadt geht eine unheimliche Magie um.',
+                avatar: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80',
+                color: '#f59e0b', tags: ['Fantasy', 'Magie', 'Mystery'], lastPlayed: Date.now() - 300000,
+                engine: 'Llama-3-70B', favorite: false
+            },
+            {
+                id: 6, type: 'character', name: 'Aria Nebelfrost', subtitle: 'Elfen-Waldläuferin',
+                description: 'Eine geschickte Bogenschützin aus den tiefen Wäldern, die das Gleichgewicht der Natur schützt.',
+                avatar: 'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?w=400&q=80',
+                color: '#22c55e', tags: ['Fantasy', 'Elf', 'Abenteuer'], lastPlayed: Date.now() - 800000,
+                engine: 'StoryAI Ultra v2.5', favorite: false
             }
         ];
 
-        function renderList() {
-            const container = document.getElementById('listContainer');
-            let tabLabel = 'Karte';
-            if (currentTab === 'worlds') tabLabel = 'Welt';
-            if (currentTab === 'stories') tabLabel = 'Story';
+        function loadStoredItems() {
+            try {
+                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+            } catch (err) {
+                console.warn('Fehler beim Laden gespeicherter Items:', err);
+                return [];
+            }
+        }
 
-            container.innerHTML = `
-                <button class="create-item-btn" onclick="window.location.href='Character/CreateCharacter.html'">
-                    <span>+</span> Neue ${tabLabel} erstellen
-                </button>
-            `;
+        function saveStoredItems(itemsToSave) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(itemsToSave));
+        }
 
-            const filtered = items.filter(i => i.type === currentTab);
-
-            filtered.forEach(item => {
-                const isActive = item.id === activeId ? 'active' : '';
-                
-                const cardHTML = `
-                    <div class="chat-item ${isActive}" onclick="selectItem(${item.id})">
-                        <div class="avatar" style="background-image: url('${item.avatar}')"></div>
-                        <div class="item-info">
-                            <div class="item-name-row">
-                                <span class="item-name">
-                                    ${item.name}
-                                    <span class="color-indicator" style="background-color: ${item.color}; box-shadow: 0 0 8px ${item.color};"></span>
-                                </span>
-                                <span class="item-meta">${item.meta}</span>
-                            </div>
-                            <div class="item-subtitle">${item.subtitle}</div>
-                        </div>
-                        <div class="item-actions">
-                            <button class="mini-btn" onclick="openEditModal(event, ${item.id})">Edit</button>
-                            <button class="mini-btn delete" onclick="deleteItem(event, ${item.id})">×</button>
-                        </div>
-                    </div>
-                `;
-                container.innerHTML += cardHTML;
+        const storedItems = loadStoredItems();
+        if (storedItems.length) {
+            const merged = new Map(items.map(item => [item.id, item]));
+            storedItems.forEach(item => {
+                merged.set(item.id, item);
             });
+            items = Array.from(merged.values());
+        } else {
+            saveStoredItems(items);
         }
 
-        function switchTab(tab) {
-            currentTab = tab;
-            document.getElementById('tab-chars').classList.toggle('active', tab === 'characters');
-            document.getElementById('tab-worlds').classList.toggle('active', tab === 'worlds');
-            document.getElementById('tab-stories').classList.toggle('active', tab === 'stories');
-            
-            let placeholderText = "Suche nach Charakteren...";
-            if(tab === 'worlds') placeholderText = "Suche nach Welten...";
-            if(tab === 'stories') placeholderText = "Suche nach Stories...";
-            document.getElementById('searchBar').placeholder = placeholderText;
-            
-            renderList();
+        let activeId = null;
+        let isSettingsActive = false; 
+        let currentFilter = 'all';
+        let searchQuery = '';
+
+        function timeAgo(timestamp) {
+            const seconds = Math.floor((Date.now() - timestamp) / 1000);
+            if (seconds < 60) return "Gerade eben";
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return `Vor ${minutes} Min`;
+            const hours = Math.floor(minutes / 60);
+            if (hours < 24) return `Vor ${hours} Std`;
+            return `Vor ${Math.floor(hours / 24)} Tagen`;
         }
 
-        function selectItem(id) {
-            activeId = id;
-            const item = items.find(i => i.id === id);
-            if(item) {
-                // Wechselt auch den Sidebar-Tab passend zum Asset
-                currentTab = item.type;
-                document.getElementById('tab-chars').classList.toggle('active', currentTab === 'characters');
-                document.getElementById('tab-worlds').classList.toggle('active', currentTab === 'worlds');
-                document.getElementById('tab-stories').classList.toggle('active', currentTab === 'stories');
-            }
-            renderList();
-            loadMainDisplay();
-        }
+        function renderSidebar() {
+            const container = document.getElementById('recentList');
+            const recentItems = [...items].sort((a, b) => b.lastPlayed - a.lastPlayed).slice(0, 8);
 
-        function goBackToMenu() {
-            activeId = null;
-            renderList();
-            loadMainDisplay();
-        }
-
-        // Steuert, ob das Main Menu Dashboard (Hub) oder die Detail-Ansicht geladen wird
-        function loadMainDisplay() {
-            const mainSection = document.getElementById('dashboardMain');
-
-            if (activeId === null) {
-                // RENDERE DAS HAUPTMENÜ (HUB) MIT LATEST, POPULAR, RANDOM
-                let popularHTML = renderHubGrid('popular');
-                let latestHTML = renderHubGrid('latest');
-                let randomHTML = renderHubGrid('random');
-
-                mainSection.innerHTML = `
-                    <div class="hub-container">
-                        <div class="hub-welcome-banner">
-                            <h2>Willkommen im Story AI Hub</h2>
-                            <p>Entdecke von der Community erstellte Charaktere, immersive Welten und interaktive Abenteuer oder starte dein eigenes Projekt.</p>
-                        </div>
-
-                        <div class="hub-section">
-                            <div class="hub-section-title">🔥 Beliebt & Angesagt (Popular)</div>
-                            <div class="hub-grid">${popularHTML}</div>
-                        </div>
-
-                        <div class="hub-section">
-                            <div class="hub-section-title">✨ Zuletzt hinzugefügt (Latest)</div>
-                            <div class="hub-grid">${latestHTML}</div>
-                        </div>
-
-                        <div class="hub-section">
-                            <div class="hub-section-title">🎲 Zufällige Entdeckungen (Random)</div>
-                            <div class="hub-grid">${randomHTML}</div>
-                        </div>
+            container.innerHTML = recentItems.map(item => `
+                <div class="recent-item" onclick="openDetail(${item.id})">
+                    <div class="recent-avatar" style="background-image: url('${item.avatar}')"></div>
+                    <div class="recent-info">
+                        <div class="recent-name">${item.name}</div>
+                        <div class="recent-time">${timeAgo(item.lastPlayed)}</div>
                     </div>
-                `;
-            } else {
-                // RENDERE DIE PROFIL-DETAILANSICHT
-                const item = items.find(i => i.id === activeId);
-                if (!item) return;
-
-                const tagsHTML = item.tags.map(tag => `<span class="tag-badge">${tag}</span>`).join('');
-                let launchBtnText = 'Chat & Rollenspiel starten';
-                if(item.type === 'worlds') launchBtnText = 'Welt betreten';
-                if(item.type === 'stories') launchBtnText = 'Story-Modus starten';
-
-                mainSection.innerHTML = `
-                    <button class="back-to-hub-btn" onclick="goBackToMenu()">
-                        <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                        Zurück zum Hub
-                    </button>
-
-                    <div class="hero-banner">
-                        <div class="hero-profile">
-                            <div class="hero-avatar" style="background-image: url('${item.avatar}')"></div>
-                            <div class="hero-details">
-                                <h2>
-                                    ${item.name}
-                                    <span style="width:12px; height:12px; background:${item.color}; border-radius:50%; display:inline-block; box-shadow: 0 0 10px ${item.color};"></span>
-                                </h2>
-                                <p>${item.subtitle}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="dashboard-content">
-                        <div style="display:flex; flex-direction:column; gap:25px;">
-                            <div class="content-panel">
-                                <div class="panel-title">📝 Beschreibung & Lore</div>
-                                <p class="description-box">${item.description || 'Keine Beschreibung hinterlegt.'}</p>
-                                <div class="tag-list">${tagsHTML}</div>
-                            </div>
-
-                            <div class="content-panel">
-                                <div class="panel-title">📊 Konfigurations-Details</div>
-                                <div class="meta-grid">
-                                    <div class="meta-card">
-                                        <div class="meta-label">KI-Modell Engine</div>
-                                        <div class="meta-value">${item.engine || 'Standard-Engine'}</div>
-                                    </div>
-                                    <div class="meta-card">
-                                        <div class="meta-label">Datenbank-ID</div>
-                                        <div class="meta-value">#000${item.id}</div>
-                                    </div>
-                                    <div class="meta-card">
-                                        <div class="meta-label">Ersteller</div>
-                                        <div class="meta-value">${item.meta}</div>
-                                    </div>
-                                    <div class="meta-card">
-                                        <div class="meta-label">Typ</div>
-                                        <div class="meta-value" style="text-transform: capitalize;">${item.type}</div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="actions-sidebar">
-                            <button class="launch-btn" style="background-color: ${item.color}; box-shadow: 0 4px 20px ${item.color}44;" onclick="startRoleplay(${item.id})">
-                                <svg viewBox="0 0 24 24"><path d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zM6 9h12v2H6V9zm8 5H6v-2h8v2zm4-6H6V6h12v2z"/></svg>
-                                ${launchBtnText}
-                            </button>
-
-                            <div class="content-panel" style="display:flex; flex-direction:column; gap:12px;">
-                                <div class="panel-title" style="margin-bottom:5px; border:none; padding:0;">⚙️ Verwaltung</div>
-                                <button class="secondary-action-btn" onclick="openEditModal(event, ${item.id})">Profil editieren</button>
-                                <button class="secondary-action-btn" onclick="alert('Story-Cards & SQL-Editor geöffnet!')">Story-Cards verwalten</button>
-                                <button class="secondary-action-btn" onclick="alert('Erweiterte Prompt-Instruktionen öffnen')">System-Prompt anpassen</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            }
+                </div>
+            `).join('');
         }
 
-        // Hilfsfunktion zur Generierung der Hub-Grids
-        function renderHubGrid(groupName) {
-            const filteredItems = items.filter(i => i.hubGroup === groupName);
-            if(filteredItems.length === 0) return `<p style="color:var(--text-muted); font-size:0.9rem;">Keine Einträge in dieser Kategorie.</p>`;
+        function getFilteredItems() {
+            return items.filter(item => {
+                const matchesFilter = currentFilter === 'all' ||
+                                      (currentFilter === 'favorite' ? item.favorite : item.type === currentFilter);
+                const matchesSearch = item.name.toLowerCase().includes(searchQuery) || item.description.toLowerCase().includes(searchQuery);
+                return matchesFilter && matchesSearch;
+            }).sort((a, b) => a.name.localeCompare(b.name));
+        }
 
-            return filteredItems.map(item => {
-                let badgeLabel = 'Character';
-                if(item.type === 'worlds') badgeLabel = 'World';
-                if(item.type === 'stories') badgeLabel = 'Story';
+        function renderFilterTabs() {
+            const tabs = document.getElementById('filterTabs');
+            if (!tabs) return;
+            const hasFavorites = items.some(item => item.favorite);
+            tabs.innerHTML = `
+                <button class="filter-tab ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">Alle Einträge</button>
+                <button class="filter-tab ${currentFilter === 'character' ? 'active' : ''}" onclick="setFilter('character')">Charaktere</button>
+                <button class="filter-tab ${currentFilter === 'world' ? 'active' : ''}" onclick="setFilter('world')">Welten</button>
+                <button class="filter-tab ${currentFilter === 'story' ? 'active' : ''}" onclick="setFilter('story')">Stories</button>
+                ${hasFavorites ? `<button class="filter-tab ${currentFilter === 'favorite' ? 'active' : ''}" onclick="setFilter('favorite')">Favorite</button>` : ''}
+            `;
+        }
 
+        function renderLibraryGrid() {
+            const grid = document.getElementById('libraryGrid');
+            if (!grid) return;
+            const filteredItems = getFilteredItems();
+            const gridHTML = filteredItems.map(item => {
+                let typeLabel = item.type === 'character' ? 'Charakter' : item.type === 'world' ? 'Welt' : 'Story';
                 return `
-                    <div class="hub-card" onclick="selectItem(${item.id})">
-                        <div class="hub-card-meta">${badgeLabel}</div>
-                        <div class="hub-card-top">
-                            <div class="hub-card-avatar" style="background-image: url('${item.avatar}')"></div>
-                            <div class="hub-card-body">
-                                <h4>
-                                    ${item.name}
-                                    <span style="width:8px; height:8px; background:${item.color}; border-radius:50%; display:inline-block;"></span>
-                                </h4>
-                                <p>${item.subtitle}</p>
+                    <div class="lib-card animate-in" onclick="openDetail(${item.id})">
+                        <div class="card-badge">${typeLabel}</div>
+                        <button class="card-favorite-btn ${item.favorite ? 'is-favorite' : ''}" onclick="toggleFavorite(event, ${item.id})" title="Favorit">
+                            <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;">
+                                <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/>
+                            </svg>
+                        </button>
+                        <div class="card-cover" style="background-image: url('${item.avatar}')"></div>
+                        <div class="card-body">
+                            <div class="card-title">
+                                ${item.name}
+                                <span class="color-dot" style="background-color: ${item.color}; box-shadow: 0 0 8px ${item.color};"></span>
+                            </div>
+                            <div class="card-subtitle" style="color: ${item.color}">${item.subtitle}</div>
+                            <div class="card-desc">${item.description}</div>
+                            <div class="card-footer">
+                                <div class="card-actions">
+                                    <button class="card-btn card-btn-play" onclick="event.stopPropagation(); window.location.href='Character/GameCharacter.html?id=${item.id}'">Play</button>
+                                    <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); window.location.href='Character/CreateCharacter.html?id=${item.id}'">Edit</button>
+                                </div>
                             </div>
                         </div>
                     </div>
                 `;
             }).join('');
+
+            grid.innerHTML = gridHTML || '<p style="color:var(--text-muted); grid-column:1/-1;">Keine Einträge gefunden.</p>';
         }
 
-        function startRoleplay(id) {
+        function setFilter(type) {
+            currentFilter = type;
+            if (!isSettingsActive && activeId === null) {
+                renderFilterTabs();
+                renderLibraryGrid();
+                return;
+            }
+            renderMainArea();
+        }
+
+        function handleSearch(event) {
+            searchQuery = event.target.value.toLowerCase();
+            if (!isSettingsActive && activeId === null) {
+                renderLibraryGrid();
+                return;
+            }
+            renderMainArea();
+        }
+
+        function openDetail(id) {
+            isSettingsActive = false;
+            activeId = id;
+            const itemIndex = items.findIndex(i => i.id === id);
+            if(itemIndex !== -1) {
+                items[itemIndex].lastPlayed = Date.now();
+            }
+            renderApp();
+        }
+
+        function openSettings() {
+            activeId = null;
+            isSettingsActive = true;
+            renderApp();
+        }
+
+        function goBackToLibrary() {
+            activeId = null;
+            isSettingsActive = false;
+            renderApp();
+        }
+
+        /* Favoriten umschalten */
+        function toggleFavorite(event, id) {
+            event.stopPropagation(); // Verhindert das Öffnen der Detailansicht
             const item = items.find(i => i.id === id);
-            alert(`Leite weiter zur Chat-Engine für: "${item.name}"...\n(Verlinkung zur chat.html wird hier integriert)`);
-        }
-
-        function toggleModal(id, show) {
-            document.getElementById(id).classList.toggle('open', show);
-        }
-
-        function openEditModal(event, id) {
-            event.stopPropagation();
-            const item = items.find(i => i.id === id);
-            if(!item) return;
-
-            document.getElementById('editItemId').value = item.id;
-            document.getElementById('editName').value = item.name;
-            document.getElementById('editSubtitle').value = item.subtitle;
-            document.getElementById('editDescription').value = item.description || '';
-            document.getElementById('editColor').value = item.color;
-
-            toggleModal('editModal', true);
-        }
-
-        function saveCharacterEdits() {
-            const id = parseInt(document.getElementById('editItemId').value);
-            const item = items.find(i => i.id === id);
-            
-            if(item) {
-                item.name = document.getElementById('editName').value;
-                item.subtitle = document.getElementById('editSubtitle').value;
-                item.description = document.getElementById('editDescription').value;
-                item.color = document.getElementById('editColor').value;
+            if (item) {
+                item.favorite = !item.favorite;
                 
-                toggleModal('editModal', false);
-                renderList();
-                loadMainDisplay();
-            }
-        }
-
-        function deleteItem(event, id) {
-            event.stopPropagation();
-            if(confirm('Möchtest du diesen Eintrag wirklich löschen?')) {
-                items = items.filter(i => i.id !== id);
-                renderList();
-                if(activeId === id) {
-                    activeId = null;
+                // Falls kein Favorit mehr existiert und man im Favoriten-Tab war, zurück zu 'all' springen
+                const hasFavorites = items.some(i => i.favorite);
+                if (currentFilter === 'favorite' && !hasFavorites) {
+                    currentFilter = 'all';
                 }
-                loadMainDisplay();
+                
+                if (!isSettingsActive && activeId === null) {
+                    renderFilterTabs();
+                    renderLibraryGrid();
+                    return;
+                }
+                renderMainArea();
             }
         }
 
-        // Initiale Ausführung beim Laden der Seite (startet im Hub Menü)
-        renderList();
-        loadMainDisplay();
+        function renderMainArea() {
+            const main = document.getElementById('dashboardMain');
+
+            // 1. SETTINGS ANSICHT
+            if (isSettingsActive) {
+                main.innerHTML = `
+                    <div class="animate-in">
+                        <button class="back-btn" onclick="goBackToLibrary()">
+                            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                            Zurück zur Bibliothek
+                        </button>
+
+                        <div class="library-topbar" style="margin-bottom: 40px;">
+                            <div class="library-title">
+                                <h2>⚙️ Einstellungen</h2>
+                                <p>Passe die App-Konfiguration und deine KI-API-Schlüssel an.</p>
+                            </div>
+                        </div>
+
+                        <div class="detail-grid" style="grid-template-columns: 1fr;">
+                            <div class="detail-panel">
+                                <h3>🧠 API & Sprachmodelle</h3>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Standard-Modell (Engine)</h4>
+                                        <p>Wähle das globale KI-Modell für neue Chats.</p>
+                                    </div>
+                                    <select style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; font-weight:600;">
+                                        <option>StoryAI Ultra v2.5 (Empfohlen)</option>
+                                        <option>Roleplay-Claude</option>
+                                        <option>Llama-3-70B</option>
+                                    </select>
+                                </div>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Eigener API-Key</h4>
+                                        <p>Nutze deinen eigenen API-Schlüssel für unbegrenzte Generierungen.</p>
+                                    </div>
+                                    <input type="password" placeholder="sk-proj-................" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; width: 250px;">
+                                </div>
+                            </div>
+
+                            <div class="detail-panel" style="margin-top: 25px;">
+                                <h3>🎨 Interface & Layout</h3>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Glow-Effekte aktivieren</h4>
+                                        <p>Zeigt farbige Leuchteffekte hinter Karten und Avataren.</p>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Erweiterter Immersions-Modus</h4>
+                                        <p>Blendet UI-Elemente während intensiven Rollenspielen dezent aus.</p>
+                                    </div>
+                                    <label class="toggle-switch">
+                                        <input type="checkbox">
+                                        <span class="slider"></span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            // 2. BIBLIOTHEK (GRID VIEW)
+            if (activeId === null) {
+                let filteredItems = items.filter(item => {
+                    const matchesFilter = currentFilter === 'all' || 
+                                          (currentFilter === 'favorite' ? item.favorite : item.type === currentFilter);
+                    const matchesSearch = item.name.toLowerCase().includes(searchQuery) || item.description.toLowerCase().includes(searchQuery);
+                    return matchesFilter && matchesSearch;
+                });
+
+                filteredItems.sort((a, b) => a.name.localeCompare(b.name));
+
+                const gridHTML = filteredItems.map(item => {
+                    let typeLabel = item.type === 'character' ? 'Charakter' : item.type === 'world' ? 'Welt' : 'Story';
+                    return `
+                        <div class="lib-card animate-in" onclick="openDetail(${item.id})">
+                            <div class="card-badge">${typeLabel}</div>
+                            <button class="card-favorite-btn ${item.favorite ? 'is-favorite' : ''}" onclick="toggleFavorite(event, ${item.id})" title="Favorit">
+                                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;">
+                                    <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/>
+                                </svg>
+                            </button>
+                            <div class="card-cover" style="background-image: url('${item.avatar}')"></div>
+                            <div class="card-body">
+                                <div class="card-title">
+                                    ${item.name}
+                                    <span class="color-dot" style="background-color: ${item.color}; box-shadow: 0 0 8px ${item.color};"></span>
+                                </div>
+                                <div class="card-subtitle" style="color: ${item.color}">${item.subtitle}</div>
+                                <div class="card-desc">${item.description}</div>
+                                <div class="card-footer">
+                                    <div class="card-actions">
+                                        <button class="card-btn card-btn-play" onclick="event.stopPropagation(); window.location.href='GameCharacter.html?id=${item.id}'">Play</button>
+                                        <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); window.location.href='Character/CreateCharacter.html?id=${item.id}'">Edit</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                // Prüfen ob es Favoriten gibt
+                const hasFavorites = items.some(item => item.favorite);
+
+                main.innerHTML = `
+                    <div class="library-topbar animate-in">
+                        <div class="library-title">
+                            <h2>Deine Bibliothek</h2>
+                            <p>Verwalte all deine erstellten und gespeicherten Abenteuer.</p>
+                        </div>
+                        <div class="topbar-actions">
+                            <div class="search-container">
+                                <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+                                <input id="searchInput" type="text" placeholder="Bibliothek durchsuchen..." value="${searchQuery}" onkeyup="handleSearch(event)">
+                            </div>
+                            <button class="create-btn" onclick="window.location.href='Character/CreateCharacter.html'">+ Erstellen</button>
+                        </div>
+                    </div>
+
+                    <div id="filterTabs" class="filter-tabs animate-in"></div>
+                    <div id="libraryGrid" class="library-grid"></div>
+                `;
+                renderFilterTabs();
+                renderLibraryGrid();
+                return;
+            } else {
+                // 3. DETAIL ANSICHT
+                const item = items.find(i => i.id === activeId);
+                if(!item) return;
+
+                const tagsHTML = item.tags.map(tag => `<span class="tag">${tag}</span>`).join('');
+                let btnText = item.type === 'character' ? 'Chat starten' : item.type === 'world' ? 'Welt betreten' : 'Story fortsetzen';
+
+                main.innerHTML = `
+                    <div class="animate-in">
+                        <button class="back-btn" onclick="goBackToLibrary()">
+                            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                            Zurück zur Bibliothek
+                        </button>
+
+                        <div class="detail-hero">
+                            <div class="detail-avatar" style="background-image: url('${item.avatar}'); border-color: ${item.color}"></div>
+                            <div class="detail-info">
+                                <h1>${item.name}</h1>
+                                <p style="color: ${item.color}; font-weight: 600;">${item.subtitle}</p>
+                            </div>
+                        </div>
+
+                        <div class="detail-grid">
+                            <div class="detail-panel">
+                                <h3>📝 Lore & Hintergrund</h3>
+                                <p style="color: #cbd5e1; line-height: 1.6;">${item.description}</p>
+                                <div class="tags-container">${tagsHTML}</div>
+                            </div>
+                            
+                            <div>
+                                <button class="action-btn-large" style="background-color: ${item.color}; box-shadow: 0 4px 20px ${item.color}44;">
+                                    ${btnText}
+                                </button>
+                                <div class="detail-panel" style="margin-top: 20px;">
+                                    <h3>⚙️ Setup</h3>
+                                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">KI Engine:</p>
+                                    <p style="font-weight: 600; margin-bottom: 15px;">${item.engine}</p>
+                                    <button style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; cursor:pointer;" onclick="window.location.href='Character/CreateCharacter.html?id=${item.id}'">Bearbeiten</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function renderApp() {
+            renderSidebar();
+            renderMainArea();
+        }
+
+        // Initialisierung
+        renderApp();
     </script>
 </body>
 </html>
