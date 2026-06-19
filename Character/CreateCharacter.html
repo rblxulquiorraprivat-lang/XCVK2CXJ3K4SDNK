@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Story AI - Charakter Erstellen</title>
+    <title>Story AI - Create Character</title>
     <style>
         * {
             box-sizing: border-box;
@@ -34,7 +34,7 @@
             overflow-x: hidden;
         }
 
-        /* --- TOP NAVIGATION BAR --- */
+        /* ---TOP NAVIGATION BAR --- */
         .top-navbar {
             background-color: var(--bg-sidebar);
             border-bottom: 1px solid var(--border-color);
@@ -77,7 +77,7 @@
             letter-spacing: 0.5px;
         }
 
-        /* --- MAIN CREATOR CREATIVE LAYOUT --- */
+        /* ---MAIN CREATOR CREATIVE LAYOUT --- */
         .creator-container {
             flex: 1;
             max-width: 1400px;
@@ -270,7 +270,7 @@
             color: #ff4a4a;
         }
 
-        /* --- PREVIEW PANEL (RIGHT SIDE) --- */
+        /* ---PREVIEW PANEL (RIGHT SIDE) --- */
         .creator-preview-panel {
             display: flex;
             flex-direction: column;
@@ -468,7 +468,7 @@
     <nav class="top-navbar">
         <a href="../index.html" class="back-link">
             <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-            Zurück zum Hub
+            Back to the hub
         </a>
         <div class="nav-title">Story AI Database Studio</div>
         <div style="width: 130px;"></div>
@@ -478,64 +478,64 @@
         
         <main class="creator-form-panel">
             <div class="panel-heading">
-                <h2>Neuen Charakter registrieren</h2>
-                <p>Konfiguriere das vollständige relationale Schema für die Charakter-Entität (Perchance Database Match).</p>
+                <h2>Create New Character</h2>
+                <p>Configure the complete relational schema for the character entity (Perchance Database Match).</p>
             </div>
 
             <form id="characterForm" onsubmit="handleFormSubmit(event)">
                 
                 <div class="section-subtitle">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                    1. Identitäts- & Systemdaten
+                    1. Identity & System Data
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="charStoryName">Charakter Name</label>
-                    <input type="text" id="charStoryName" class="form-control" placeholder="z.B. Konata Izumi" required oninput="updatePreview()">
+                    <label class="form-label" for="charStoryName">Character Name</label>
+                    <input type="text" id="charStoryName" class="form-control" placeholder="e.g., Konata Izumi" required oninput="updatePreview()">
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="charShortDesc">ShortDesc (Kurzbeschreibung)</label>
+                    <label class="form-label" for="charShortDesc">Short Desc</label>
                     <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" required oninput="updatePreview()">
                 </div>
 
                 <div class="section-subtitle">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                    2. Charakter-Eigenschaften (Core Attributes)
+                    2. Character Properties
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="charAppearance">Appearance (Das Aussehen)</label>
-                    <textarea id="charAppearance" class="form-control" placeholder="Blaue Haare, Ahoge, kleine Statur, schläfrige Augen..." oninput="updatePreview()"></textarea>
+                    <label class="form-label" for="charAppearance">Appearance</label>
+                    <textarea id="charAppearance" class="form-control" placeholder="Blue hair, ahoge, small stature, sleepy eyes..." oninput="updatePreview()"></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="charPersonality">Personality (Die Persönlichkeit)</label>
+                    <label class="form-label" for="charPersonality">Personality</label>
                     <textarea id="charPersonality" class="form-control" placeholder="Exzentrisch, sarkastisch, freundlich, extrem leidenschaftlich bezüglich Videospielen und Animes..." oninput="updatePreview()"></textarea>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label">Einleitungen</label>
+                    <label class="form-label">Introductions</label>
                     <div class="dynamic-list-container">
                         <div class="dynamic-input-row">
-                            <input type="text" id="introInput" class="form-control" placeholder="z.B. ‚Ich habe immer die Sterne beobachtet...‘">
-                            <button type="button" class="btn-add-dynamic" onclick="addIntroduction()">Hinzufügen</button>
+                            <input type="text" id="introInput" class="form-control" placeholder="e.g., 'I have always observed the stars...'">
+                            <button type="button" class="btn-add-dynamic" onclick="addIntroduction()">Add</button>
                         </div>
                         <div id="introductionsListDisplay" class="secrets-list-display"></div>
                         <div id="introductionHelp" style="font-size:0.85rem; color:var(--text-muted); margin-top:8px;">
-                            Mindestens 1 Einleitung. Maximal 10 Einleitungen.
+                            At least 1 introduction. Maximum 10 introductions.
                         </div>
                     </div>
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="charGenerally">Generally (Allgemeines / Andere Infos)</label>
+                    <label class="form-label" for="charGenerally">Generally</label>
                     <textarea id="charGenerally" class="form-control" placeholder="Arbeitet in einem Cosplay-Café. Hasst es, für die Schule zu lernen und macht alles in der letzten Nacht..." oninput="updatePreview()"></textarea>
                 </div>
 
                 <div class="section-subtitle">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-                    3. Visuelle Assets & Kosmetik
+                    3. Visual Assets & Cosmetics
                 </div>
 
                 <div class="form-group row-2">
@@ -556,15 +556,15 @@
 
                 <div class="section-subtitle">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H8.9V6zM18 20H6V10h12v10z"/></svg>
-                    4. Relationale Metadaten (Tags & Secrets)
+                    4. Relational Metadata (Tags & Secrets)
                 </div>
 
                 <div class="form-group row-2">
                     <div>
-                        <label class="form-label">Verborgene Geheimnisse (Secrets)</label>
+                        <label class="form-label">Hidden Secrets</label>
                         <div class="dynamic-list-container">
                             <div class="dynamic-input-row">
-                                <input type="text" id="secretInput" class="form-control" placeholder="z.B. Hat heimlich Angst vor Hunden">
+                                <input type="text" id="secretInput" class="form-control" placeholder="e.g., Is secretly afraid of dogs">
                                 <button type="button" class="btn-add-dynamic" onclick="addSecret()">Add</button>
                             </div>
                             <div id="secretsListDisplay" class="secrets-list-display"></div>
@@ -572,10 +572,10 @@
                     </div>
 
                     <div>
-                        <label class="form-label">Such-Tags / Kategorien</label>
+                        <label class="form-label">Search Tags / Categories</label>
                         <div class="dynamic-list-container">
                             <div class="dynamic-input-row">
-                                <input type="text" id="tagInput" class="form-control" placeholder="z.B. Anime">
+                                <input type="text" id="tagInput" class="form-control" placeholder="e.g., Anime">
                                 <button type="button" class="btn-add-dynamic" onclick="addTag()">Add</button>
                             </div>
                             <div id="tagsWrapper" class="tags-wrapper"></div>
@@ -585,7 +585,7 @@
 
                 <button type="submit" class="create-submit-btn">
                     <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                    <span class="submit-text">Charakter-Entität lokal initialisieren</span>
+                    <span class="submit-text">Initialize Character Entity Locally</span>
                 </button>
             </form>
         </main>
@@ -593,7 +593,7 @@
         <aside class="creator-preview-panel">
             <div class="preview-sticky-title">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3"/></svg>
-                Echtzeit-Vorschau
+                Real time preview
             </div>
 
             <div class="live-card" id="previewCard">
@@ -611,21 +611,21 @@
                         </div>
                     </div>
 
-                    <div class="live-subtitle" id="previewShortDesc">Anime Otaku • Fröhlich</div>
+                    <div class="live-subtitle" id="previewShortDesc">Anime Otaku • Happy</div>
                     
                     <div class="live-description" id="previewDescription">
-                        Wähle Felder links aus, um die Live-Vorschau der Engine-Generierung zu sehen...
+                        Select fields on the left to see the live preview of engine generation...
                     </div>
 
                     <div class="preview-details-grid">
                         <div class="preview-detail-item"><strong>Status:</strong> <span id="previewStatusText">Lokal angelegt</span></div>
-                        <div class="preview-detail-item"><strong>Einleitungen:</strong> <span id="previewIntroductionsCount">0</span></div>
+                        <div class="preview-detail-item"><strong>Introductions:</strong> <span id="previewIntroductionsCount">0</span></div>
                     </div>
 
                     <div class="live-tags" id="previewTags"></div>
                     
                     <div class="live-secrets-count" id="previewSecretsCount">
-                        🔒 0 aktive Secrets hinterlegt
+                        🔒 0 active secrets stored
                     </div>
                 </div>
             </div>
@@ -646,8 +646,8 @@
         }
 
         function updatePreview() {
-            const storyName = document.getElementById('charStoryName').value || 'Unbenannt';
-            const shortDesc = document.getElementById('charShortDesc').value || 'Keine Kurzbeschreibung';
+            const storyName = document.getElementById('charStoryName').value || 'Unnamed';
+            const shortDesc = document.getElementById('charShortDesc').value || 'No short description';
             const appearance = document.getElementById('charAppearance').value || '';
             const personality = document.getElementById('charPersonality').value || '';
             const color = document.getElementById('charColor').value;
@@ -655,13 +655,13 @@
             document.getElementById('previewStoryName').innerText = storyName;
             document.getElementById('previewShortDesc').innerText = shortDesc;
 
-            // Preview-Text kombinieren
+            // Combine preview text
             let descSnippet = '';
             if(appearance) descSnippet += `<strong>[Aussehen]</strong> ${appearance.substring(0,60)}...<br>`;
             if(personality) descSnippet += `<strong>[Persönlichkeit]</strong> ${personality.substring(0,60)}...`;
-            document.getElementById('previewDescription').innerHTML = descSnippet || 'Wähle Felder links aus, um die Live-Vorschau der Engine-Generierung zu sehen...';
+            document.getElementById('previewDescription').innerHTML = descSnippet || 'Select fields on the left to see the live preview of engine generation...';
 
-            // Avatar & Banner
+            // Avatar and Banner
             const avatarUrl = document.getElementById('charAvatar').value;
             if(avatarUrl) document.getElementById('previewAvatar').style.backgroundImage = `url('${avatarUrl}')`;
             
@@ -690,7 +690,7 @@
                 item.innerHTML = `<span>🔒 ${sec}</span><span class="remove-btn" onclick="removeSecret(${idx})">×</span>`;
                 container.appendChild(item);
             });
-            document.getElementById('previewSecretsCount').innerText = `🔒 ${currentSecrets.length} aktive Secrets hinterlegt`;
+            document.getElementById('previewSecretsCount').innerText = `🔒 ${currentSecrets.length} active secrets stored`;
         }
 
         function addSecret() {
@@ -717,7 +717,7 @@
                 item.innerHTML = `<span>💬 ${intro}</span><span class="remove-btn" onclick="removeIntroduction(${idx})">×</span>`;
                 container.appendChild(item);
             });
-            document.getElementById('introductionHelp').innerText = `Mindestens 1 Einleitung. Aktuell: ${currentIntroductions.length} / 10`;
+            document.getElementById('introductionHelp').innerText = `At least 1 introduction. Current: ${currentIntroductions.length} /10`;
             renderIntroductionPreview();
         }
 
@@ -726,7 +726,7 @@
             const value = input.value.trim();
             if (!value) return;
             if (currentIntroductions.length >= 10) {
-                alert('Maximal 10 Einleitungen erlaubt. Entferne zuerst eine vorhandene Einleitung.');
+                alert('Maximum of 10 introductions allowed. First remove an existing introduction.');
                 return;
             }
             currentIntroductions.push(value);
@@ -742,7 +742,7 @@
         function renderIntroductionPreview() {
             const preview = document.getElementById('previewIntroductionsCount');
             if (!preview) return;
-            preview.innerText = `${currentIntroductions.length} Einleitung${currentIntroductions.length === 1 ? '' : 'en'}`;
+            preview.innerText = `${currentIntroductions.length} Introduction${currentIntroductions.length === 1 ? '' : 'en'}`;
         }
 
         // Tags Management
@@ -787,7 +787,7 @@
             renderSecrets();
             renderIntroductions();
             updatePreview();
-            document.querySelector('.create-submit-btn').innerText = 'Charakter speichern';
+            document.querySelector('.create-submit-btn').innerText = 'Save character';
         }
 
         function addTag() {
@@ -810,7 +810,7 @@
             try {
                 return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
             } catch (err) {
-                console.warn('Fehler beim Laden gespeicherter Items:', err);
+                console.warn('Error loading saved items:', err);
                 return [];
             }
         }
@@ -819,7 +819,7 @@
             localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
         }
 
-        // Submit Payload verarbeiten
+        // Process submit payload
         function handleFormSubmit(e) {
             e.preventDefault();
             
@@ -874,7 +874,7 @@
             saveStoredItems(savedItems);
 
             console.log("Database Object Payload compiled:", fullCharacterEntity);
-            alert(`🎉 Erfolg! Charakter "${fullCharacterEntity.storyName}" wurde erfolgreich ${isEditing ? 'aktualisiert' : 'angelegt'}.\n\nLeite dich zurück zum Dashboard Hub...`);
+            alert(`🎉 Success! Character "${fullCharacterEntity.storyName}" was successfully ${isEditing ? 'updated' : 'created'}.\n\nRedirect you back to the Dashboard Hub...`);
             window.location.href = '../index.html';
         }
 
@@ -918,7 +918,7 @@
             }
         }
 
-        // Initialer Start beim Laden
+        // Initial start when loading
         window.addEventListener('DOMContentLoaded', () => {
             initializeForm();
         });
