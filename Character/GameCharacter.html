@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Immersive Chat</title>
-    <!-- Bridge Script for Perchance AI Text Plugin -->
     <script>
         // Fake AI object for the UI to use while waiting for the bridge
         const perchanceBridge = {
@@ -331,6 +330,14 @@
             display: flex;
             flex-direction: column;
             gap: 4px;
+            position: relative;
+            width: 100%;
+        }
+
+        .msg-header-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
         .msg-sender-name {
@@ -342,6 +349,25 @@
         .user-msg-wrapper .msg-sender-name {
             text-align: right;
             margin-right: 4px;
+        }
+
+        .msg-trash-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            opacity: 0.6;
+        }
+
+        .msg-trash-btn:hover {
+            color: #ef4444;
+            opacity: 1;
+            transform: scale(1.1);
         }
 
         .msg-content {
@@ -652,8 +678,7 @@
                 <div>
                     <div class="info-block-title">🏷️ Attribute / Tags</div>
                     <div class="tags-grid" id="sidebarTags">
-                        <!-- Tags rendered here -->
-                    </div>
+                        </div>
                 </div>
             </div>
         </aside>
@@ -672,8 +697,7 @@
             </section>
 
             <section class="story-log-area" id="storyLog">
-                <!-- Chat messages rendered here -->
-            </section>
+                </section>
 
             <div class="typing-indicator" id="typingIndicator">
                 <div class="typing-dot"></div>
@@ -825,12 +849,10 @@
 
         function formatJanitorText(text) {
             let formatted = text;
-            // Convert double-asterisk and single-asterisk narration markers to styled text without leaving the markers.
             formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<em class="narration">$1</em>');
             formatted = formatted.replace(/\*([^*]+)\*/g, '<em class="narration">$1</em>');
             formatted = formatted.replace(/__([^_]+)__/g, '<em class="narration">$1</em>');
             formatted = formatted.replace(/_([^_]+)_/g, '<em class="narration">$1</em>');
-            // Basic line breaks
             formatted = formatted.replace(/\n/g, '<br>');
             return formatted;
         }
@@ -879,7 +901,8 @@
                 avatar: currentCharacter.avatar,
                 rerollGroupId: groupId,
                 versionNumber: index + 1,
-                versionCount: intros.length
+                versionCount: intros.length,
+                isIntro: true
             }));
             refreshRerollGroups();
             setGroupDisplayVersion(groupId, 1);
@@ -906,15 +929,18 @@
 
         function getGroupDisplayVersion(groupId) {
             if (!groupId) return null;
-            let version = window.groupDisplayVersion?.[groupId];
-            if (!version) {
-                const versions = chatHistory.filter(msg => msg.rerollGroupId === groupId);
-                if (!versions.length) return null;
+            if (!window.groupDisplayVersion) window.groupDisplayVersion = {};
+            let version = window.groupDisplayVersion[groupId];
+            
+            const versions = chatHistory.filter(msg => msg.rerollGroupId === groupId);
+            if (!versions.length) return null;
+            
+            const validVersions = versions.map(msg => msg.versionNumber);
+            if (!version || !validVersions.includes(version)) {
                 const introGroupDefaultFirst = String(groupId).endsWith('_intro');
                 version = introGroupDefaultFirst
-                    ? Math.min(...versions.map(msg => msg.versionNumber))
-                    : Math.max(...versions.map(msg => msg.versionNumber));
-                if (!window.groupDisplayVersion) window.groupDisplayVersion = {};
+                    ? Math.min(...validVersions)
+                    : Math.max(...validVersions);
                 window.groupDisplayVersion[groupId] = version;
             }
             return version;
@@ -930,6 +956,44 @@
             return msg.versionNumber === getGroupDisplayVersion(msg.rerollGroupId);
         }
 
+        function deleteMessagePair(botMsgIndex) {
+            if (confirm("Möchtest du diese Nachricht und deine dazugehörige Antwort wirklich löschen?")) {
+                const botMsg = chatHistory[botMsgIndex];
+                if (!botMsg || botMsg.sender !== 'bot') return;
+
+                let indicesToRemove = [botMsgIndex];
+
+                // Falls es eine gererollte Nachricht ist, lösche alle Varianten dieser Gruppe
+                if (botMsg.rerollGroupId) {
+                    chatHistory.forEach((msg, idx) => {
+                        if (msg.rerollGroupId === botMsg.rerollGroupId && idx !== botMsgIndex) {
+                            indicesToRemove.push(idx);
+                        }
+                    });
+                }
+
+                // Finde die direkte User-Nachricht davor
+                let userMsgIndex = -1;
+                for (let i = Math.min(...indicesToRemove) - 1; i >= 0; i--) {
+                    if (chatHistory[i].sender === 'user') {
+                        userMsgIndex = i;
+                        break;
+                    }
+                }
+
+                if (userMsgIndex !== -1) {
+                    indicesToRemove.push(userMsgIndex);
+                }
+
+                // Filtere die Nachrichten heraus
+                chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.includes(idx));
+                
+                refreshRerollGroups();
+                saveChatHistory();
+                renderChatLog();
+            }
+        }
+
         function buildAIPromptForReroll() {
             const contextLimit = 10;
             const visibleHistory = chatHistory.filter(msg => isMessageVisible(msg));
@@ -939,29 +1003,19 @@
             const recentHistory = visibleHistory.slice(-contextLimit);
             const effectiveName = currentCharacter.characterName || currentCharacter.name;
 
-            let prompt = `You are not roleplaying a character; you are ${effectiveName}.
-`;
-            prompt += `Name: ${effectiveName}.
-`;
-            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.
-`;
-            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.
-`;
-            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.
-`;
+            let prompt = `You are not roleplaying a character; you are ${effectiveName}.\n`;
+            prompt += `Name: ${effectiveName}.\n`;
+            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
+            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
+            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.\n`;
             if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
-                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.
-`;
+                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
             }
-            prompt += `Description: ${currentCharacter.description}.
-`;
+            prompt += `Description: ${currentCharacter.description}.\n`;
             if (selectedPersona) {
-                prompt += `Persona: ${selectedPersona.name}.
-`;
-                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.
-`;
-                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.
-`;
+                prompt += `Persona: ${selectedPersona.name}.\n`;
+                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.\n`;
+                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.\n`;
             }
 
             const textSizeInstruction = settings.textSize === 'Short'
@@ -977,16 +1031,12 @@
                         ? 'Répondre en français.'
                         : 'Answer in English.';
 
-            prompt += `${languageInstruction} ${textSizeInstruction}
-
-`;
+            prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
             for (const msg of recentHistory) {
                 if (msg.sender === 'user') {
-                    prompt += `User: ${msg.text}
-`;
+                    prompt += `User: ${msg.text}\n`;
                 } else {
-                    prompt += `${currentCharacter.name}: ${msg.text}
-`;
+                    prompt += `${currentCharacter.name}: ${msg.text}\n`;
                 }
             }
             prompt += `${currentCharacter.name}:`;
@@ -1015,11 +1065,15 @@
             try {
                 const prompt = buildAIPromptForReroll();
                 const responseText = await perchanceBridge.generateText(prompt, ['User:', '\nUser:']);
-                const groupId = lastBot.rerollGroupId || Date.now();
+                const groupId = lastBot.rerollGroupId || 'group_' + Date.now();
 
                 if (!lastBot.rerollGroupId) {
-                    lastBot.rerollGroupId = groupId;
-                    lastBot.versionNumber = 1;
+                    // Update den Original-Eintrag im globalen Array
+                    const originalIdx = chatHistory.findIndex(m => m === lastBot);
+                    if (originalIdx !== -1) {
+                        chatHistory[originalIdx].rerollGroupId = groupId;
+                        chatHistory[originalIdx].versionNumber = 1;
+                    }
                 }
 
                 const existingVersions = chatHistory.filter(msg => msg.rerollGroupId === groupId);
@@ -1130,23 +1184,36 @@
         function renderChatLog() {
             const logArea = document.getElementById('storyLog');
             
-            const groupedChat = chatHistory.filter(msg => isMessageVisible(msg));
+            const visibleMessages = chatHistory.filter(msg => isMessageVisible(msg));
             const lastVisibleBotIndex = (() => {
-                for (let i = groupedChat.length - 1; i >= 0; i--) {
-                    if (groupedChat[i].sender === 'bot') return i;
+                for (let i = visibleMessages.length - 1; i >= 0; i--) {
+                    if (visibleMessages[i].sender === 'bot') return i;
                 }
                 return -1;
             })();
 
-            logArea.innerHTML = groupedChat.map((msg, index) => {
+            logArea.innerHTML = visibleMessages.map((msg, index) => {
                 const isUser = (msg.sender === 'user');
                 const formattedText = formatJanitorText(msg.text);
                 const isLastBot = !isUser && index === lastVisibleBotIndex;
                 const groupId = msg.rerollGroupId;
                 const groupVersions = groupId ? chatHistory.filter(m => m.rerollGroupId === groupId).sort((a, b) => a.versionNumber - b.versionNumber) : [];
                 const introGroup = groupId && String(groupId).endsWith('_intro');
+                
+                // Index im originalen chatHistory-Array finden, um das korrekte Löschen zu triggern
+                const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
+
+                // Delete Button anzeigen (nur für Bots und NICHT die Einleitung)
+                const showDeleteBtn = !isUser && !msg.isIntro && !introGroup;
+                const deleteBtnHtml = showDeleteBtn ? `
+                    <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
+                        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                ` : '';
+
                 const showRerollControls = isLastBot && !isUser && !introGroup;
                 const showVersionControls = isLastBot && !isUser && groupVersions.length > 1;
+                
                 const versionControls = showVersionControls ? `
                         <div class="msg-variant-controls">
                             <button type="button" class="control-btn" onclick="navigateRerollVersion('${groupId}', -1)"><</button>
@@ -1169,7 +1236,10 @@
                     <div class="msg-wrapper ${isUser ? 'user-msg-wrapper' : 'bot-msg-wrapper'}">
                         <div class="msg-bubble-avatar" style="background-image: url('${isUser ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80' : msg.avatar}')"></div>
                         <div class="msg-bubble-body">
-                            <div class="msg-sender-name">${displayName}</div>
+                            <div class="msg-header-row">
+                                <div class="msg-sender-name">${displayName}</div>
+                                ${deleteBtnHtml}
+                            </div>
                             <div class="msg-content">${formattedText}</div>
                             ${controlRow}
                         </div>
@@ -1181,7 +1251,6 @@
         }
 
         function buildAIPrompt() {
-            // Construct a prompt context based on character info and chat history
             let prompt = `You are not roleplaying a character; you are ${currentCharacter.name}.\n`;
             prompt += `Name: ${currentCharacter.name}.\n`;
             if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
@@ -1213,8 +1282,7 @@
             prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
             prompt += `When speaking, wrap spoken text in double quotes. Use asterisks only to mark actions or expressions. The final output should not keep the asterisks in the rendered text.\n\n`;
 
-            // Add conversation history
-            const contextLimit = 10; // Only send last few messages to save context/time
+            const contextLimit = 10;
             const recentHistory = chatHistory.slice(-contextLimit);
             
             for (const msg of recentHistory) {
@@ -1270,7 +1338,8 @@
                     name: effectiveName,
                     characterName: effectiveName,
                     text: responseText.trim(),
-                    avatar: currentCharacter.avatar
+                    avatar: currentCharacter.avatar,
+                    isIntro: true
                 }];
                 saveChatHistory();
                 renderChatLog();
@@ -1281,7 +1350,8 @@
                     name: effectiveName,
                     characterName: effectiveName,
                     text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
-                    avatar: currentCharacter.avatar
+                    avatar: currentCharacter.avatar,
+                    isIntro: true
                 }];
                 saveChatHistory();
                 renderChatLog();
