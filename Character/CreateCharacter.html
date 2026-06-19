@@ -515,6 +515,20 @@
                 </div>
 
                 <div class="form-group">
+                    <label class="form-label">Einleitungen</label>
+                    <div class="dynamic-list-container">
+                        <div class="dynamic-input-row">
+                            <input type="text" id="introInput" class="form-control" placeholder="z.B. ‚Ich habe immer die Sterne beobachtet...‘">
+                            <button type="button" class="btn-add-dynamic" onclick="addIntroduction()">Hinzufügen</button>
+                        </div>
+                        <div id="introductionsListDisplay" class="secrets-list-display"></div>
+                        <div id="introductionHelp" style="font-size:0.85rem; color:var(--text-muted); margin-top:8px;">
+                            Mindestens 1 Einleitung. Maximal 10 Einleitungen.
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
                     <label class="form-label" for="charGenerally">Generally (Allgemeines / Andere Infos)</label>
                     <textarea id="charGenerally" class="form-control" placeholder="Arbeitet in einem Cosplay-Café. Hasst es, für die Schule zu lernen und macht alles in der letzten Nacht..." oninput="updatePreview()"></textarea>
                 </div>
@@ -605,6 +619,7 @@
 
                     <div class="preview-details-grid">
                         <div class="preview-detail-item"><strong>Status:</strong> <span id="previewStatusText">Lokal angelegt</span></div>
+                        <div class="preview-detail-item"><strong>Einleitungen:</strong> <span id="previewIntroductionsCount">0</span></div>
                     </div>
 
                     <div class="live-tags" id="previewTags"></div>
@@ -621,6 +636,7 @@
     <script>
         let currentTags = [];
         let currentSecrets = [];
+        let currentIntroductions = [];
         let editId = null;
         let isEditing = false;
 
@@ -661,6 +677,7 @@
             card.style.borderColor = `${color}44`;
 
             renderTagsPreview();
+            renderIntroductionPreview();
         }
 
         // Secrets Management
@@ -688,6 +705,44 @@
         function removeSecret(idx) {
             currentSecrets.splice(idx, 1);
             renderSecrets();
+        }
+
+        // Introductions Management
+        function renderIntroductions() {
+            const container = document.getElementById('introductionsListDisplay');
+            container.innerHTML = '';
+            currentIntroductions.forEach((intro, idx) => {
+                const item = document.createElement('div');
+                item.className = 'secret-item';
+                item.innerHTML = `<span>💬 ${intro}</span><span class="remove-btn" onclick="removeIntroduction(${idx})">×</span>`;
+                container.appendChild(item);
+            });
+            document.getElementById('introductionHelp').innerText = `Mindestens 1 Einleitung. Aktuell: ${currentIntroductions.length} / 10`;
+            renderIntroductionPreview();
+        }
+
+        function addIntroduction() {
+            const input = document.getElementById('introInput');
+            const value = input.value.trim();
+            if (!value) return;
+            if (currentIntroductions.length >= 10) {
+                alert('Maximal 10 Einleitungen erlaubt. Entferne zuerst eine vorhandene Einleitung.');
+                return;
+            }
+            currentIntroductions.push(value);
+            input.value = '';
+            renderIntroductions();
+        }
+
+        function removeIntroduction(idx) {
+            currentIntroductions.splice(idx, 1);
+            renderIntroductions();
+        }
+
+        function renderIntroductionPreview() {
+            const preview = document.getElementById('previewIntroductionsCount');
+            if (!preview) return;
+            preview.innerText = `${currentIntroductions.length} Einleitung${currentIntroductions.length === 1 ? '' : 'en'}`;
         }
 
         // Tags Management
@@ -727,8 +782,10 @@
             document.getElementById('charColor').value = item.color || '#6366f1';
             currentTags = Array.isArray(item.tags) ? [...item.tags] : [];
             currentSecrets = Array.isArray(item.secrets) ? [...item.secrets] : [];
+            currentIntroductions = Array.isArray(item.introductions) ? [...item.introductions] : [];
             renderTags();
             renderSecrets();
+            renderIntroductions();
             updatePreview();
             document.querySelector('.create-submit-btn').innerText = 'Charakter speichern';
         }
@@ -774,6 +831,11 @@
             const avatarUrl = document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80';
             const coverUrl = document.getElementById('charCoverUrl').value || '';
 
+            if (currentIntroductions.length === 0) {
+                alert('Bitte füge mindestens eine Einleitung hinzu.');
+                return;
+            }
+
             const fullCharacterEntity = {
                 id: editId || savedItems.reduce((maxId, item) => Math.max(maxId, item.id || 0), 6) + 1,
                 type: 'character',
@@ -789,6 +851,7 @@
                 coverURL: avatarUrl,
                 backgroundURL: coverUrl,
                 color: document.getElementById('charColor').value,
+                introductions: currentIntroductions,
                 secrets: currentSecrets,
                 tags: currentTags,
                 lastPlayed: Date.now(),
@@ -820,8 +883,10 @@
             if (!editParam) {
                 currentTags = ['Otaku', 'Comedy'];
                 currentSecrets = [];
+                currentIntroductions = [];
                 renderTags();
                 renderSecrets();
+                renderIntroductions();
                 updatePreview();
                 return;
             }
@@ -830,8 +895,10 @@
             if (Number.isNaN(editIdValue)) {
                 currentTags = ['Otaku', 'Comedy'];
                 currentSecrets = [];
+                currentIntroductions = [];
                 renderTags();
                 renderSecrets();
+                renderIntroductions();
                 updatePreview();
                 return;
             }
@@ -843,8 +910,10 @@
             } else {
                 currentTags = ['Otaku', 'Comedy'];
                 currentSecrets = [];
+                currentIntroductions = [];
                 renderTags();
                 renderSecrets();
+                renderIntroductions();
                 updatePreview();
             }
         }

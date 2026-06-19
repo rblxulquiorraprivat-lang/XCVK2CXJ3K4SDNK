@@ -271,6 +271,21 @@
             color: #fff;
         }
 
+        .msg-reroll-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+
+        .msg-variant-controls {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
         .story-log-area {
             flex: 1;
             overflow-y: auto;
@@ -812,15 +827,227 @@
             const savedHistory = localStorage.getItem(CHAT_HISTORY_PREFIX + currentCharacter.id);
             if (savedHistory) {
                 chatHistory = JSON.parse(savedHistory);
+                if (currentCharacter && currentCharacter.characterName) {
+                    chatHistory = chatHistory.map(msg => {
+                        if (msg.sender === 'bot' && !msg.characterName) {
+                            return {
+                                ...msg,
+                                characterName: currentCharacter.characterName || currentCharacter.name
+                            };
+                        }
+                        return msg;
+                    });
+                }
+                refreshRerollGroups();
                 renderChatLog();
             } else {
-                // Initialize with AI greeting if empty
-                await generateInitialGreeting();
+                await initializeIntroductoryChat();
             }
         }
 
         function saveChatHistory() {
             localStorage.setItem(CHAT_HISTORY_PREFIX + currentCharacter.id, JSON.stringify(chatHistory));
+        }
+
+        async function initializeIntroductoryChat() {
+            const intros = Array.isArray(currentCharacter.introductions)
+                ? currentCharacter.introductions.filter(text => text && text.trim())
+                : [];
+
+            if (!intros.length) {
+                await generateInitialGreeting();
+                return;
+            }
+
+            const groupId = `${currentCharacter.id}_intro`;
+            chatHistory = intros.map((text, index) => ({
+                sender: 'bot',
+                name: currentCharacter.name,
+                text: text.trim(),
+                avatar: currentCharacter.avatar,
+                rerollGroupId: groupId,
+                versionNumber: index + 1,
+                versionCount: intros.length
+            }));
+            refreshRerollGroups();
+            setGroupDisplayVersion(groupId, 1);
+            saveChatHistory();
+            renderChatLog();
+        }
+
+        function refreshRerollGroups() {
+            const grouped = {};
+            chatHistory.forEach(msg => {
+                if (msg.rerollGroupId) {
+                    grouped[msg.rerollGroupId] = grouped[msg.rerollGroupId] || [];
+                    grouped[msg.rerollGroupId].push(msg);
+                }
+            });
+            for (const groupId in grouped) {
+                const versions = grouped[groupId].sort((a, b) => a.versionNumber - b.versionNumber);
+                const count = versions.length;
+                versions.forEach(msg => {
+                    msg.versionCount = count;
+                });
+            }
+        }
+
+        function getGroupDisplayVersion(groupId) {
+            if (!groupId) return null;
+            let version = window.groupDisplayVersion?.[groupId];
+            if (!version) {
+                const versions = chatHistory.filter(msg => msg.rerollGroupId === groupId);
+                if (!versions.length) return null;
+                const introGroupDefaultFirst = String(groupId).endsWith('_intro');
+                version = introGroupDefaultFirst
+                    ? Math.min(...versions.map(msg => msg.versionNumber))
+                    : Math.max(...versions.map(msg => msg.versionNumber));
+                if (!window.groupDisplayVersion) window.groupDisplayVersion = {};
+                window.groupDisplayVersion[groupId] = version;
+            }
+            return version;
+        }
+
+        function setGroupDisplayVersion(groupId, version) {
+            if (!window.groupDisplayVersion) window.groupDisplayVersion = {};
+            window.groupDisplayVersion[groupId] = version;
+        }
+
+        function isMessageVisible(msg) {
+            if (!msg.rerollGroupId) return true;
+            return msg.versionNumber === getGroupDisplayVersion(msg.rerollGroupId);
+        }
+
+        function buildAIPromptForReroll() {
+            const contextLimit = 10;
+            const visibleHistory = chatHistory.filter(msg => isMessageVisible(msg));
+            if (visibleHistory.length && visibleHistory[visibleHistory.length - 1].sender === 'bot') {
+                visibleHistory.pop();
+            }
+            const recentHistory = visibleHistory.slice(-contextLimit);
+            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+
+            let prompt = `You are not roleplaying a character; you are ${effectiveName}.
+`;
+            prompt += `Name: ${effectiveName}.
+`;
+            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.
+`;
+            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.
+`;
+            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.
+`;
+            if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
+                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.
+`;
+            }
+            prompt += `Description: ${currentCharacter.description}.
+`;
+            if (selectedPersona) {
+                prompt += `Persona: ${selectedPersona.name}.
+`;
+                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.
+`;
+                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.
+`;
+            }
+
+            const textSizeInstruction = settings.textSize === 'Short'
+                ? 'Keep replies short and concise.'
+                : settings.textSize === 'Long'
+                    ? 'Use longer, more detailed replies.'
+                    : 'Use moderate response length.';
+            const languageInstruction = settings.language === 'German'
+                ? 'Antworten auf Deutsch.'
+                : settings.language === 'Spanish'
+                    ? 'Responde en español.'
+                    : settings.language === 'French'
+                        ? 'Répondre en français.'
+                        : 'Answer in English.';
+
+            prompt += `${languageInstruction} ${textSizeInstruction}
+
+`;
+            for (const msg of recentHistory) {
+                if (msg.sender === 'user') {
+                    prompt += `User: ${msg.text}
+`;
+                } else {
+                    prompt += `${currentCharacter.name}: ${msg.text}
+`;
+                }
+            }
+            prompt += `${currentCharacter.name}:`;
+            return prompt;
+        }
+
+        function getLastVisibleBotMessage() {
+            const visibleHistory = chatHistory.filter(msg => isMessageVisible(msg));
+            for (let i = visibleHistory.length - 1; i >= 0; i--) {
+                if (visibleHistory[i].sender === 'bot') return visibleHistory[i];
+            }
+            return null;
+        }
+
+        async function rerollLatestBotMessage() {
+            if (isWaitingForAI) return;
+            const lastBot = getLastVisibleBotMessage();
+            if (!lastBot) return;
+
+            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+            if (lastBot.rerollGroupId && String(lastBot.rerollGroupId).endsWith('_intro')) {
+                return;
+            }
+
+            setLoadingState(true);
+            try {
+                const prompt = buildAIPromptForReroll();
+                const responseText = await perchanceBridge.generateText(prompt, ['User:', '\nUser:']);
+                const groupId = lastBot.rerollGroupId || Date.now();
+
+                if (!lastBot.rerollGroupId) {
+                    lastBot.rerollGroupId = groupId;
+                    lastBot.versionNumber = 1;
+                }
+
+                const existingVersions = chatHistory.filter(msg => msg.rerollGroupId === groupId);
+                const nextVersion = existingVersions.length + 1;
+
+                const newMsg = {
+                    sender: 'bot',
+                    name: effectiveName,
+                    characterName: effectiveName,
+                    text: responseText.trim(),
+                    avatar: currentCharacter.avatar,
+                    rerollGroupId: groupId,
+                    versionNumber: nextVersion,
+                    versionCount: nextVersion
+                };
+                chatHistory.push(newMsg);
+                refreshRerollGroups();
+                setGroupDisplayVersion(groupId, nextVersion);
+                saveChatHistory();
+                renderChatLog();
+            } catch (error) {
+                console.error('AI Error:', error);
+                alert(`AI Generation Error: ${error.message}`);
+            } finally {
+                setLoadingState(false);
+            }
+        }
+
+        function navigateRerollVersion(groupId, direction) {
+            const versions = chatHistory
+                .filter(msg => msg.rerollGroupId === groupId)
+                .sort((a, b) => a.versionNumber - b.versionNumber);
+            if (!versions.length) return;
+            let current = getGroupDisplayVersion(groupId);
+            if (!current) current = versions[versions.length - 1].versionNumber;
+            let next = current + direction;
+            if (next < 1) next = 1;
+            if (next > versions.length) next = versions.length;
+            setGroupDisplayVersion(groupId, next);
+            renderChatLog();
         }
 
         function updatePersonaButton() {
@@ -891,16 +1118,48 @@
         function renderChatLog() {
             const logArea = document.getElementById('storyLog');
             
-            logArea.innerHTML = chatHistory.map(msg => {
+            const groupedChat = chatHistory.filter(msg => isMessageVisible(msg));
+            const lastVisibleBotIndex = (() => {
+                for (let i = groupedChat.length - 1; i >= 0; i--) {
+                    if (groupedChat[i].sender === 'bot') return i;
+                }
+                return -1;
+            })();
+
+            logArea.innerHTML = groupedChat.map((msg, index) => {
                 const isUser = (msg.sender === 'user');
                 const formattedText = formatJanitorText(msg.text);
+                const isLastBot = !isUser && index === lastVisibleBotIndex;
+                const groupId = msg.rerollGroupId;
+                const groupVersions = groupId ? chatHistory.filter(m => m.rerollGroupId === groupId).sort((a, b) => a.versionNumber - b.versionNumber) : [];
+                const introGroup = groupId && String(groupId).endsWith('_intro');
+                const showRerollControls = isLastBot && !isUser && !introGroup;
+                const showVersionControls = isLastBot && !isUser && groupVersions.length > 1;
+                const versionControls = showVersionControls ? `
+                        <div class="msg-variant-controls">
+                            <button type="button" class="control-btn" onclick="navigateRerollVersion('${groupId}', -1)"><</button>
+                            <span>${getGroupDisplayVersion(groupId)} / ${groupVersions.length}</span>
+                            <button type="button" class="control-btn" onclick="navigateRerollVersion('${groupId}', 1)">></button>
+                        </div>
+                    ` : '';
+                const rerollButton = showRerollControls ? `
+                        <button type="button" class="control-btn" onclick="rerollLatestBotMessage()">🔄 Neu würfeln</button>
+                    ` : '';
+                const controlRow = (versionControls || rerollButton) ? `
+                        <div class="msg-reroll-row">
+                            ${versionControls}
+                            ${rerollButton}
+                        </div>
+                    ` : '';
+                const displayName = isUser ? 'Du' : (msg.characterName || currentCharacter.characterName || msg.name || currentCharacter.name);
                 
                 return `
                     <div class="msg-wrapper ${isUser ? 'user-msg-wrapper' : 'bot-msg-wrapper'}">
                         <div class="msg-bubble-avatar" style="background-image: url('${isUser ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80' : msg.avatar}')"></div>
                         <div class="msg-bubble-body">
-                            <div class="msg-sender-name">${isUser ? 'Du' : msg.name}</div>
+                            <div class="msg-sender-name">${displayName}</div>
                             <div class="msg-content">${formattedText}</div>
+                            ${controlRow}
                         </div>
                     </div>
                 `;
@@ -990,12 +1249,14 @@
             prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
             prompt += `Write an introductory greeting as ${currentCharacter.name}. Wrap spoken sentences in double quotes. Use asterisks only for actions or expressions, and do not keep them in the final output.`;
             
+            const effectiveName = currentCharacter.characterName || currentCharacter.name;
             try {
                 const responseText = await perchanceBridge.generateText(prompt, ['User:']);
                 
                 chatHistory = [{
                     sender: 'bot',
-                    name: currentCharacter.name,
+                    name: effectiveName,
+                    characterName: effectiveName,
                     text: responseText.trim(),
                     avatar: currentCharacter.avatar
                 }];
@@ -1005,7 +1266,8 @@
                 console.error("AI Error:", error);
                 chatHistory = [{
                     sender: 'bot',
-                    name: currentCharacter.name,
+                    name: effectiveName,
+                    characterName: effectiveName,
                     text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
                     avatar: currentCharacter.avatar
                 }];
@@ -1039,10 +1301,12 @@
             try {
                 const prompt = buildAIPrompt();
                 const responseText = await perchanceBridge.generateText(prompt, ['User:', '\nUser:']);
+                const effectiveName = currentCharacter.characterName || currentCharacter.name;
                 
                 chatHistory.push({
                     sender: 'bot',
-                    name: currentCharacter.name,
+                    name: effectiveName,
+                    characterName: effectiveName,
                     text: responseText.trim(),
                     avatar: currentCharacter.avatar
                 });
