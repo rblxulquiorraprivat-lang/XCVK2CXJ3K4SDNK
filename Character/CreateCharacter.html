@@ -72,6 +72,7 @@
             font-size: 1.3rem;
             font-weight: 800;
             background: linear-gradient(90deg, #ffffff, #a5b4fc);
+            background-clip: text;
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             letter-spacing: 0.5px;
@@ -461,6 +462,137 @@
         .create-submit-btn svg {
             width: 18px; height: 18px; fill: currentColor;
         }
+
+        @media (max-width: 980px) {
+            body {
+                min-height: 100vh;
+            }
+
+            .top-navbar {
+                padding: 12px 16px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            .back-link {
+                order: 1;
+            }
+
+            .nav-title {
+                order: 2;
+                width: 100%;
+                text-align: center;
+                font-size: 1rem;
+            }
+
+            .creator-container {
+                margin: 20px auto 28px;
+                padding: 0 12px;
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+
+            .creator-form-panel {
+                padding: 20px;
+                border-radius: 20px;
+            }
+
+            .panel-heading h2 {
+                font-size: 1.3rem;
+            }
+
+            .panel-heading p {
+                font-size: 0.88rem;
+            }
+
+            .section-subtitle {
+                font-size: 0.9rem;
+            }
+
+            .form-group.row-2 {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .dynamic-input-row {
+                flex-direction: column;
+            }
+
+            .btn-add-dynamic {
+                min-height: 42px;
+                padding: 10px 14px;
+            }
+
+            .creator-preview-panel {
+                position: static;
+                gap: 16px;
+            }
+
+            .preview-sticky-title {
+                font-size: 0.8rem;
+            }
+
+            .live-card {
+                border-radius: 20px;
+            }
+
+            .live-banner {
+                height: 140px;
+            }
+
+            .live-body {
+                padding: 40px 18px 18px 18px;
+            }
+
+            .create-submit-btn {
+                padding: 14px;
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 560px) {
+            .top-navbar {
+                padding: 10px 12px;
+            }
+
+            .back-link {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .creator-container {
+                margin: 14px auto 20px;
+                padding: 0 10px;
+            }
+
+            .creator-form-panel {
+                padding: 16px;
+            }
+
+            .panel-heading {
+                margin-bottom: 18px;
+            }
+
+            .form-control {
+                padding: 11px 13px;
+                font-size: 0.94rem;
+            }
+
+            .live-avatar-frame {
+                width: 72px;
+                height: 72px;
+                left: 18px;
+                bottom: -24px;
+            }
+
+            .live-body {
+                padding: 34px 14px 16px 14px;
+            }
+
+            .live-name {
+                font-size: 1.2rem;
+            }
+        }
     </style>
 </head>
 <body>
@@ -495,8 +627,8 @@
                 </div>
 
                 <div class="form-group">
-                    <label class="form-label" for="charShortDesc">Short Desc</label>
-                    <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" required oninput="updatePreview()">
+                    <label class="form-label" for="charShortDesc">Short Desc <span style="font-weight:400; color: var(--text-muted); text-transform:none;">(optional)</span></label>
+                    <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" oninput="updatePreview()">
                 </div>
 
                 <div class="section-subtitle">
