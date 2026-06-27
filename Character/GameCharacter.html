@@ -270,6 +270,125 @@
             color: #fff;
         }
 
+        .icon-btn {
+            width: 40px;
+            height: 40px;
+            padding: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn svg {
+            width: 18px;
+            height: 18px;
+            fill: currentColor;
+        }
+
+        .npc-info-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.72);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+        }
+
+        .npc-info-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(720px, calc(100vw - 24px));
+            max-height: min(80vh, 760px);
+            background: rgba(10, 10, 16, 0.98);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+            z-index: 2001;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .npc-info-modal__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .npc-info-modal__title {
+            font-size: 1.05rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .npc-info-modal__subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .npc-info-modal__body {
+            padding: 20px 22px 24px;
+            display: grid;
+            gap: 16px;
+            overflow-y: auto;
+        }
+
+        .npc-info-section {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 14px;
+        }
+
+        .npc-info-section__title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: var(--text-main);
+        }
+
+        .npc-info-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .npc-info-item {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 10px 12px;
+            color: #e2e8f0;
+            font-size: 0.92rem;
+            line-height: 1.5;
+        }
+
+        .npc-info-item small {
+            display: block;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            margin-top: 4px;
+        }
+
+        .modal-close-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 10px;
+            transition: var(--transition);
+        }
+
+        .modal-close-btn:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+
         .msg-reroll-row {
             display: flex;
             align-items: center;
@@ -391,6 +510,30 @@
             color: #ef4444;
             opacity: 1;
             transform: scale(1.1);
+        }
+
+        .msg-favorite-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            opacity: 0.7;
+        }
+
+        .msg-favorite-btn:hover {
+            color: #fbbf24;
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .msg-favorite-btn.is-favorite {
+            color: #fbbf24;
+            opacity: 1;
         }
 
         .msg-content {
@@ -850,9 +993,37 @@
                     </div>
                 </div>
                 <div class="topbar-actions-right">
+                    <button type="button" class="control-btn icon-btn" id="npcInfoBtn" onclick="toggleNpcInfoModal()" title="NPC Memories & Favorites">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96c-.5-.38-1.04-.7-1.64-.94L14.4 2.5a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.6.24-1.14.56-1.64.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 10.74a.5.5 0 0 0 .12.64l2.03 1.58c-.04.3-.06.61-.06.94s.02.64.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.38 1.04.7 1.64.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .49-.42l.36-2.54c.6-.24 1.14-.56 1.64-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
+                        </svg>
+                    </button>
                     <a href="../index.html" class="control-btn">Back to Hub</a>
                 </div>
             </section>
+
+            <div class="npc-info-backdrop" id="npcInfoBackdrop" style="display: none;" onclick="closeNpcInfoModal()"></div>
+            <div class="npc-info-modal" id="npcInfoModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="npcInfoTitle">
+                <div class="npc-info-modal__header">
+                    <div>
+                        <div class="npc-info-modal__title" id="npcInfoTitle">NPC Memories & Favorites</div>
+                        <div class="npc-info-modal__subtitle">Gespeicherte Kontextinformationen für diesen Charakter</div>
+                    </div>
+                    <button type="button" class="modal-close-btn" onclick="closeNpcInfoModal()" title="Schließen">
+                        <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
+                    </button>
+                </div>
+                <div class="npc-info-modal__body">
+                    <section class="npc-info-section">
+                        <div class="npc-info-section__title">Memories</div>
+                        <div class="npc-info-list" id="npcMemoriesList"></div>
+                    </section>
+                    <section class="npc-info-section">
+                        <div class="npc-info-section__title">Favorite Messages</div>
+                        <div class="npc-info-list" id="npcFavoriteMessagesList"></div>
+                    </section>
+                </div>
+            </div>
 
             <section class="story-log-area" id="storyLog">
                 </section>
@@ -889,14 +1060,39 @@
         const PERSONA_KEY = 'storyAI_personas';
         const SELECTED_PERSONA_KEY = 'storyAI_selected_persona';
         const STORY_PERSONA_KEY_PREFIX = 'storyAI_story_persona_';
+        const MEMORY_KEY_PREFIX = 'storyAI_memories_';
+        const FAVORITE_MESSAGES_KEY_PREFIX = 'storyAI_favorite_messages_';
         
         let currentCharacter = null;
         let chatHistory = [];
         let personas = [];
+        let memories = [];
+        let favoriteMessages = [];
         let selectedPersona = null;
         let personaSearchQuery = '';
         let isPersonaMenuOpen = false;
         let isWaitingForAI = false;
+        let isNpcInfoModalOpen = false;
+
+        function generateMessageId(index = 0) {
+            return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${index}`;
+        }
+
+        function ensureMessageId(msg, index = 0) {
+            if (!msg) return null;
+            if (!msg.id) {
+                msg.id = generateMessageId(index);
+            }
+            return msg.id;
+        }
+
+        function normalizeChatHistoryIds() {
+            chatHistory = chatHistory.map((msg, index) => {
+                if (!msg) return msg;
+                ensureMessageId(msg, index);
+                return msg;
+            });
+        }
 
         function getStoryPersonaKey(characterId = null) {
             const id = characterId !== null && characterId !== undefined ? characterId : currentCharacter?.id;
@@ -974,10 +1170,17 @@
             document.getElementById('ambientBg').style.backgroundImage = `url('${currentCharacter.avatar}')`;
             document.getElementById('topbarAvatar').style.backgroundImage = `url('${currentCharacter.avatar}')`;
             document.getElementById('topbarName').innerText = currentCharacter.name;
+            memories = loadMemories();
+            favoriteMessages = loadFavoriteMessages();
 
             updatePersonaButton();
             renderPersonaMenu();
             document.body.addEventListener('click', closePersonaMenu);
+            document.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    closeNpcInfoModal();
+                }
+            });
             const personaMenu = document.getElementById('personaMenu');
             if (personaMenu) {
                 personaMenu.addEventListener('click', function(e) {
@@ -1014,6 +1217,7 @@
                         return msg;
                     });
                 }
+                syncMemoriesFromChatHistory();
                 refreshRerollGroups();
                 renderChatLog();
             } else {
@@ -1022,7 +1226,224 @@
         }
 
         function saveChatHistory() {
+            normalizeChatHistoryIds();
             localStorage.setItem(CHAT_HISTORY_PREFIX + currentCharacter.id, JSON.stringify(chatHistory));
+        }
+
+        function getMemoryStorageKey() {
+            return currentCharacter?.id !== null && currentCharacter?.id !== undefined
+                ? MEMORY_KEY_PREFIX + currentCharacter.id
+                : null;
+        }
+
+        function loadMemories() {
+            try {
+                const key = getMemoryStorageKey();
+                if (!key) return [];
+                const raw = localStorage.getItem(key);
+                if (!raw) return [];
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (err) {
+                console.warn('Error loading memories:', err);
+                return [];
+            }
+        }
+
+        function saveMemories() {
+            const key = getMemoryStorageKey();
+            if (!key) return;
+            localStorage.setItem(key, JSON.stringify(memories));
+        }
+
+        function getFavoriteMessagesKey() {
+            return currentCharacter?.id !== null && currentCharacter?.id !== undefined
+                ? FAVORITE_MESSAGES_KEY_PREFIX + currentCharacter.id
+                : null;
+        }
+
+        function loadFavoriteMessages() {
+            try {
+                const key = getFavoriteMessagesKey();
+                if (!key) return [];
+                const raw = localStorage.getItem(key);
+                const parsed = raw ? JSON.parse(raw) : [];
+                return Array.isArray(parsed) ? parsed : [];
+            } catch (err) {
+                console.warn('Error loading favorite messages:', err);
+                return [];
+            }
+        }
+
+        function saveFavoriteMessages() {
+            const key = getFavoriteMessagesKey();
+            if (!key) return;
+            localStorage.setItem(key, JSON.stringify(favoriteMessages));
+        }
+
+        function toggleFavoriteMessage(messageId) {
+            if (!messageId) return;
+            const exists = favoriteMessages.includes(messageId);
+            if (exists) {
+                favoriteMessages = favoriteMessages.filter(id => id !== messageId);
+            } else {
+                favoriteMessages.push(messageId);
+            }
+            saveFavoriteMessages();
+            renderChatLog();
+            renderNpcInfoModal();
+        }
+
+        function syncMemoriesFromChatHistory() {
+            if (!currentCharacter) return;
+
+            const existingMemories = loadMemories();
+            if (existingMemories.length) {
+                memories = existingMemories;
+                return;
+            }
+
+            const seenTexts = new Set();
+            memories = [];
+
+            chatHistory.forEach((msg, index) => {
+                if (msg.isLoading || !msg.text || !String(msg.text).trim()) return;
+                const normalized = String(msg.text).trim().toLowerCase();
+                if (seenTexts.has(normalized)) return;
+
+                seenTexts.add(normalized);
+                memories.push({
+                    id: `legacy_${index}_${Date.now()}`,
+                    sender: msg.sender,
+                    text: String(msg.text).trim(),
+                    timestamp: msg.timestamp || Date.now() - ((chatHistory.length - index) * 1000)
+                });
+            });
+
+            saveMemories();
+        }
+
+        function storeMessageAsMemory(msg) {
+            if (!msg || msg.isLoading || !msg.text || !String(msg.text).trim()) return;
+
+            const normalized = String(msg.text).trim().toLowerCase();
+            const alreadyStored = memories.some(memory => String(memory.text).trim().toLowerCase() === normalized);
+            if (alreadyStored) return;
+
+            memories.push({
+                id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+                sender: msg.sender,
+                text: String(msg.text).trim(),
+                timestamp: Date.now()
+            });
+            saveMemories();
+        }
+
+        function getFavoriteMessageContext(historyMessages = null) {
+            const contextMessages = Array.isArray(historyMessages) ? historyMessages : chatHistory;
+            return contextMessages
+                .filter(msg => msg && !msg.isLoading && typeof msg.text === 'string' && msg.text.trim())
+                .filter(msg => favoriteMessages.includes(msg.id))
+                .slice(0, 3);
+        }
+
+        function getFavoriteMessageEntries() {
+            return chatHistory
+                .filter(msg => msg && !msg.isLoading && typeof msg.text === 'string' && msg.text.trim())
+                .filter(msg => favoriteMessages.includes(msg.id))
+                .map(msg => ({
+                    ...msg,
+                    id: msg.id || ensureMessageId(msg)
+                }));
+        }
+
+        function toggleNpcInfoModal() {
+            isNpcInfoModalOpen = !isNpcInfoModalOpen;
+            const backdrop = document.getElementById('npcInfoBackdrop');
+            const modal = document.getElementById('npcInfoModal');
+            if (!backdrop || !modal) return;
+            backdrop.style.display = isNpcInfoModalOpen ? 'block' : 'none';
+            modal.style.display = isNpcInfoModalOpen ? 'flex' : 'none';
+            if (isNpcInfoModalOpen) {
+                renderNpcInfoModal();
+            }
+        }
+
+        function closeNpcInfoModal() {
+            isNpcInfoModalOpen = false;
+            const backdrop = document.getElementById('npcInfoBackdrop');
+            const modal = document.getElementById('npcInfoModal');
+            if (!backdrop || !modal) return;
+            backdrop.style.display = 'none';
+            modal.style.display = 'none';
+        }
+
+        function renderNpcInfoModal() {
+            const memoriesList = document.getElementById('npcMemoriesList');
+            const favoritesList = document.getElementById('npcFavoriteMessagesList');
+            if (!memoriesList || !favoritesList) return;
+
+            memoriesList.innerHTML = memories.length
+                ? memories.map(memory => `
+                    <div class="npc-info-item">
+                        ${String(memory.text || '').trim()}
+                        <small>${memory.sender === 'user' ? 'User' : (currentCharacter?.name || 'NPC')}</small>
+                    </div>
+                `).join('')
+                : '<div class="npc-info-item">Noch keine Memories gespeichert.</div>';
+
+            const favoriteEntries = getFavoriteMessageEntries();
+            favoritesList.innerHTML = favoriteEntries.length
+                ? favoriteEntries.map(message => `
+                    <div class="npc-info-item">
+                        ${String(message.text || '').trim()}
+                        <small>${message.sender === 'user' ? 'User' : (message.characterName || currentCharacter?.name || 'NPC')}</small>
+                    </div>
+                `).join('')
+                : '<div class="npc-info-item">Noch keine Favoriten markiert.</div>';
+        }
+
+        function getRelevantMemories(historyMessages = null) {
+            if (!memories.length) return [];
+
+            const contextMessages = Array.isArray(historyMessages) ? historyMessages : chatHistory;
+            const recentMemories = memories.slice(-3);
+            const olderPool = memories.slice(0, Math.max(0, memories.length - 3));
+            const cutoffIndex = Math.max(0, memories.length - 10);
+            const eligibleOlder = olderPool.filter((_, index) => index < cutoffIndex);
+
+            const selectedOlder = [];
+            const usedIds = new Set(recentMemories.map(memory => memory.id));
+            const pool = [...eligibleOlder].filter(memory => !usedIds.has(memory.id));
+
+            while (selectedOlder.length < 3 && pool.length) {
+                const randomIndex = Math.floor(Math.random() * pool.length);
+                const nextMemory = pool.splice(randomIndex, 1)[0];
+                selectedOlder.push(nextMemory);
+                usedIds.add(nextMemory.id);
+            }
+
+            const baseMemories = [...recentMemories, ...selectedOlder];
+            const recentUserMessages = contextMessages.filter(msg => msg.sender === 'user').slice(-3);
+            const keywordMatches = recentUserMessages.flatMap(userMessage => {
+                const message = String(userMessage?.text || '').toLowerCase();
+                if (!message) return [];
+
+                const keywords = ['hast', 'du', 'den', 'stift', 'gesehen'];
+                const matchedKeywords = keywords.filter(keyword => message.includes(keyword));
+                if (!matchedKeywords.length) return [];
+
+                return memories.filter(memory => {
+                    const text = String(memory.text || '').toLowerCase();
+                    return matchedKeywords.some(keyword => text.includes(keyword));
+                }).slice(0, 3);
+            });
+
+            const combined = [...baseMemories, ...keywordMatches].filter((memory, index, self) =>
+                self.findIndex(candidate => candidate.id === memory.id) === index
+            );
+
+            return combined.slice(0, 9);
         }
 
         async function initializeIntroductoryChat() {
@@ -1048,6 +1469,7 @@
             }));
             refreshRerollGroups();
             setGroupDisplayVersion(groupId, 1);
+            chatHistory.forEach(msg => storeMessageAsMemory(msg));
             saveChatHistory();
             renderChatLog();
         }
@@ -1172,6 +1594,8 @@
             const contextLimit = 10;
             const history = Array.isArray(historyMessages) ? historyMessages : chatHistory;
             const recentHistory = history.filter(msg => !msg.isLoading).slice(-contextLimit);
+            const memoryContext = getRelevantMemories(history);
+            const favoriteMessageContext = getFavoriteMessageContext(history);
 
             const textSizeInstruction = settings.textSize === 'Short'
                 ? 'Keep replies short and concise.'
@@ -1203,6 +1627,22 @@
                 lines.push(`Active Persona: ${selectedPersona.name}`);
                 if (selectedPersona.generally) lines.push(`Persona Traits: ${selectedPersona.generally}`);
                 if (selectedPersona.appearance) lines.push(`Persona Appearance: ${selectedPersona.appearance}`);
+            }
+
+            if (memoryContext.length) {
+                lines.push('Character Memory:');
+                memoryContext.forEach(memory => {
+                    const senderLabel = memory.sender === 'user' ? 'The User' : characterName;
+                    lines.push(`- ${senderLabel}: ${memory.text}`);
+                });
+            }
+
+            if (favoriteMessageContext.length) {
+                lines.push('Favorite Messages:');
+                favoriteMessageContext.forEach(message => {
+                    const senderLabel = message.sender === 'user' ? 'The User' : characterName;
+                    lines.push(`- ${senderLabel}: ${message.text}`);
+                });
             }
 
             lines.push('Conversation Rules: Stay fully in character at all times, speak naturally, and never break the fourth wall.');
@@ -1296,6 +1736,7 @@
                         versionCount: (lastBot.versionCount || 1) + 1,
                         isLoading: false
                     };
+                    storeMessageAsMemory(chatHistory[originalIdx]);
                 }
 
                 refreshRerollGroups();
@@ -1417,6 +1858,8 @@
                 return null;
             })();
 
+            renderNpcInfoModal();
+
             logArea.innerHTML = visibleMessages.map((msg, index) => {
                 const isUser = (msg.sender === 'user');
                 const formattedText = formatJanitorText(msg.text);
@@ -1440,6 +1883,11 @@
                 const deleteBtnHtml = showDeleteBtn ? `
                     <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
+                    </button>
+                ` : '';
+                const favoriteBtnHtml = !isUser ? `
+                    <button type="button" class="msg-favorite-btn ${favoriteMessages.includes(msg.id) ? 'is-favorite' : ''}" title="Nachricht favorisieren" onclick="toggleFavoriteMessage('${msg.id || ''}')">
+                        <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                     </button>
                 ` : '';
 
@@ -1474,6 +1922,7 @@
                         <div class="msg-bubble-body">
                             <div class="msg-header-row">
                                 <div class="msg-sender-name">${displayName}</div>
+                                ${favoriteBtnHtml}
                                 ${deleteBtnHtml}
                             </div>
                             ${contentHtml}
@@ -1533,6 +1982,7 @@
                 text: text.trim(),
                 isLoading: false
             };
+            storeMessageAsMemory(chatHistory[targetIndex]);
             saveChatHistory();
             renderChatLog();
         }
@@ -1577,11 +2027,14 @@
             const userText = inputEl.value.trim();
             if (!userText) return;
 
-            chatHistory.push({
+            const userMessage = {
                 sender: 'user',
                 name: 'Du',
                 text: userText
-            });
+            };
+            ensureMessageId(userMessage, chatHistory.length);
+            chatHistory.push(userMessage);
+            storeMessageAsMemory(userMessage);
 
             inputEl.value = '';
             inputEl.style.height = '44px';
