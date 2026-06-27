@@ -422,6 +422,35 @@
             font-weight: 300;
         }
 
+        .msg-content-loading {
+            min-height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
+        .msg-loading-dots {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .msg-loading-dots span {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--text-muted);
+            animation: loadingPulse 1s infinite ease-in-out;
+        }
+
+        .msg-loading-dots span:nth-child(2) {
+            animation-delay: 0.2s;
+        }
+
+        .msg-loading-dots span:nth-child(3) {
+            animation-delay: 0.4s;
+        }
+
         .bottom-input-pane {
             padding: 0 10% 30px;
             background: transparent;
@@ -635,36 +664,14 @@
             font-size: 0.9rem;
         }
 
-        .typing-indicator {
-            align-self: flex-start;
-            background: rgba(24, 24, 36, 0.6);
-            border: 1px solid var(--border-color);
-            padding: 12px 20px;
-            border-radius: 16px;
-            display: none;
-            align-items: center;
-            gap: 4px;
-            margin-left: 52px;
-        }
-
-        .typing-dot {
-            width: 6px;
-            height: 6px;
-            background: var(--text-muted);
-            border-radius: 50%;
-            animation: typingWave 1.4s infinite ease-in-out;
-        }
-        .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-        .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-
         @keyframes messageFadeIn {
             from { opacity: 0; transform: translateY(12px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
-        @keyframes typingWave {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-5px); }
+        @keyframes loadingPulse {
+            0%, 80%, 100% { transform: scale(0.8); opacity: 0.45; }
+            40% { transform: scale(1); opacity: 1; }
         }
 
         @media (max-width: 1024px) {
@@ -849,12 +856,6 @@
 
             <section class="story-log-area" id="storyLog">
                 </section>
-
-            <div class="typing-indicator" id="typingIndicator">
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-                <div class="typing-dot"></div>
-            </div>
 
             <section class="bottom-input-pane">
                 <div class="input-glow-container">
@@ -1337,6 +1338,13 @@
                 const isUser = (msg.sender === 'user');
                 const formattedText = formatJanitorText(msg.text);
                 const isLastBot = !isUser && index === lastVisibleBotIndex;
+                const contentHtml = msg.isLoading ? `
+                    <div class="msg-content msg-content-loading">
+                        <div class="msg-loading-dots" aria-label="Loading response">
+                            <span></span><span></span><span></span>
+                        </div>
+                    </div>
+                ` : `<div class="msg-content">${formattedText}</div>`;
                 const groupId = msg.rerollGroupId;
                 const groupVersions = groupId ? chatHistory.filter(m => m.rerollGroupId === groupId).sort((a, b) => a.versionNumber - b.versionNumber) : [];
                 const introGroup = groupId && String(groupId).endsWith('_intro');
@@ -1381,7 +1389,7 @@
                                 <div class="msg-sender-name">${displayName}</div>
                                 ${deleteBtnHtml}
                             </div>
-                            <div class="msg-content">${formattedText}</div>
+                            ${contentHtml}
                             ${controlRow}
                         </div>
                     </div>
@@ -1438,8 +1446,37 @@
             return prompt;
         }
 
+        function addPendingBotMessage() {
+            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+            const pendingMsg = {
+                sender: 'bot',
+                name: effectiveName,
+                characterName: effectiveName,
+                text: '',
+                avatar: currentCharacter.avatar,
+                isLoading: true
+            };
+            chatHistory.push(pendingMsg);
+            saveChatHistory();
+            renderChatLog();
+            return pendingMsg;
+        }
+
+        function finalizePendingBotMessage(pendingMsg, text) {
+            const targetIndex = chatHistory.findIndex(msg => msg === pendingMsg);
+            if (targetIndex === -1) return;
+            chatHistory[targetIndex] = {
+                ...pendingMsg,
+                text: text.trim(),
+                isLoading: false
+            };
+            saveChatHistory();
+            renderChatLog();
+        }
+
         async function generateInitialGreeting() {
             setLoadingState(true);
+            const pendingMsg = addPendingBotMessage();
             const textSizeInstruction = settings.textSize === 'Short'
                 ? 'Keep replies short and concise.'
                 : settings.textSize === 'Long'
@@ -1474,26 +1511,24 @@
             try {
                 const responseText = await perchanceBridge.generateText(prompt, ['User:']);
                 
-                chatHistory = [{
-                    sender: 'bot',
-                    name: effectiveName,
-                    characterName: effectiveName,
+                finalizePendingBotMessage(pendingMsg, responseText.trim());
+                chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
+                    ...msg,
                     text: responseText.trim(),
-                    avatar: currentCharacter.avatar,
+                    isLoading: false,
                     isIntro: true
-                }];
+                } : msg);
                 saveChatHistory();
                 renderChatLog();
             } catch (error) {
                 console.error("AI Error:", error);
-                chatHistory = [{
-                    sender: 'bot',
-                    name: effectiveName,
-                    characterName: effectiveName,
+                finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
+                chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
+                    ...msg,
                     text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
-                    avatar: currentCharacter.avatar,
+                    isLoading: false,
                     isIntro: true
-                }];
+                } : msg);
                 saveChatHistory();
                 renderChatLog();
             } finally {
@@ -1519,25 +1554,16 @@
             saveChatHistory();
             renderChatLog();
 
+            const pendingMsg = addPendingBotMessage();
             setLoadingState(true);
 
             try {
                 const prompt = buildAIPrompt();
                 const responseText = await perchanceBridge.generateText(prompt, ['User:', '\nUser:']);
-                const effectiveName = currentCharacter.characterName || currentCharacter.name;
-                
-                chatHistory.push({
-                    sender: 'bot',
-                    name: effectiveName,
-                    characterName: effectiveName,
-                    text: responseText.trim(),
-                    avatar: currentCharacter.avatar
-                });
-                
-                saveChatHistory();
-                renderChatLog();
+                finalizePendingBotMessage(pendingMsg, responseText.trim());
             } catch (error) {
                 console.error("AI Error:", error);
+                finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
                 alert(`AI Generation Error: ${error.message}`);
             } finally {
                 setLoadingState(false);
@@ -1546,18 +1572,15 @@
 
         function setLoadingState(isLoading) {
             isWaitingForAI = isLoading;
-            const indicator = document.getElementById('typingIndicator');
             const logArea = document.getElementById('storyLog');
             const sendBtn = document.getElementById('sendBtn');
             const chatInput = document.getElementById('chatInput');
             
             if (isLoading) {
-                indicator.style.display = 'flex';
                 logArea.scrollTop = logArea.scrollHeight;
                 sendBtn.disabled = true;
                 chatInput.disabled = true;
             } else {
-                indicator.style.display = 'none';
                 sendBtn.disabled = false;
                 chatInput.disabled = false;
                 chatInput.focus();
