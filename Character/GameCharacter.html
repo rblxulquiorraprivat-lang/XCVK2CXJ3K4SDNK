@@ -1098,38 +1098,49 @@
             return msg.versionNumber === getGroupDisplayVersion(msg.rerollGroupId);
         }
 
-        function deleteMessagePair(botMsgIndex) {
-            if (confirm("Möchtest du diese Nachricht und deine dazugehörige Antwort wirklich löschen?")) {
-                const botMsg = chatHistory[botMsgIndex];
-                if (!botMsg || botMsg.sender !== 'bot') return;
+        function deleteMessagePair(msgIndex) {
+            if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
+                const targetMsg = chatHistory[msgIndex];
+                if (!targetMsg) return;
 
-                let indicesToRemove = [botMsgIndex];
+                let indicesToRemove = [msgIndex];
 
-                // Falls es eine gererollte Nachricht ist, lösche alle Varianten dieser Gruppe
-                if (botMsg.rerollGroupId) {
-                    chatHistory.forEach((msg, idx) => {
-                        if (msg.rerollGroupId === botMsg.rerollGroupId && idx !== botMsgIndex) {
-                            indicesToRemove.push(idx);
+                if (targetMsg.sender === 'bot') {
+                    if (targetMsg.rerollGroupId) {
+                        chatHistory.forEach((msg, idx) => {
+                            if (msg.rerollGroupId === targetMsg.rerollGroupId && idx !== msgIndex) {
+                                indicesToRemove.push(idx);
+                            }
+                        });
+                    }
+
+                    let userMsgIndex = -1;
+                    for (let i = msgIndex - 1; i >= 0; i--) {
+                        if (chatHistory[i].sender === 'user') {
+                            userMsgIndex = i;
+                            break;
                         }
-                    });
-                }
+                    }
 
-                // Finde die direkte User-Nachricht davor
-                let userMsgIndex = -1;
-                for (let i = Math.min(...indicesToRemove) - 1; i >= 0; i--) {
-                    if (chatHistory[i].sender === 'user') {
-                        userMsgIndex = i;
-                        break;
+                    if (userMsgIndex !== -1) {
+                        indicesToRemove.push(userMsgIndex);
+                    }
+                } else if (targetMsg.sender === 'user') {
+                    let botMsgIndex = -1;
+                    for (let i = msgIndex + 1; i < chatHistory.length; i++) {
+                        if (chatHistory[i].sender === 'bot') {
+                            botMsgIndex = i;
+                            break;
+                        }
+                    }
+
+                    if (botMsgIndex !== -1) {
+                        indicesToRemove.push(botMsgIndex);
                     }
                 }
 
-                if (userMsgIndex !== -1) {
-                    indicesToRemove.push(userMsgIndex);
-                }
-
-                // Filtere die Nachrichten heraus
                 chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.includes(idx));
-                
+
                 refreshRerollGroups();
                 saveChatHistory();
                 renderChatLog();
@@ -1353,14 +1364,14 @@
                 const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
 
                 // Delete Button anzeigen (nur für Bots und NICHT die Einleitung)
-                const showDeleteBtn = !isUser && !msg.isIntro && !introGroup;
+                const showDeleteBtn = (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
                 const deleteBtnHtml = showDeleteBtn ? `
                     <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                     </button>
                 ` : '';
 
-                const showRerollControls = isLastBot && !isUser && !introGroup;
+                const showRerollControls = isLastBot && !isUser && !introGroup && !msg.isLoading;
                 const showVersionControls = isLastBot && !isUser && groupVersions.length > 1;
                 
                 const versionControls = showVersionControls ? `
