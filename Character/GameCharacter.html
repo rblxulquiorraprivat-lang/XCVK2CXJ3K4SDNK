@@ -1101,10 +1101,16 @@
         function deleteMessagePair(msgIndex) {
             if (isWaitingForAI) return;
 
-            if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
-                const targetMsg = chatHistory[msgIndex];
-                if (!targetMsg) return;
+            const targetMsg = chatHistory[msgIndex];
+            if (!targetMsg) return;
 
+            const introGroup = targetMsg.rerollGroupId && String(targetMsg.rerollGroupId).endsWith('_intro');
+            const isIntroMessage = Boolean(targetMsg.isIntro || introGroup || (targetMsg.sender === 'bot' && msgIndex === 0 && chatHistory.length > 0 && chatHistory[0].sender === 'bot' && chatHistory[0].isLoading === false));
+            if (isIntroMessage) {
+                return;
+            }
+
+            if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
                 let indicesToRemove = [msgIndex];
 
                 if (targetMsg.sender === 'bot') {
@@ -1252,41 +1258,68 @@
                 return;
             }
 
+            const groupId = lastBot.rerollGroupId || 'group_' + Date.now();
+            const originalIdx = chatHistory.findIndex(m => m === lastBot);
+
+            if (originalIdx !== -1) {
+                chatHistory[originalIdx] = {
+                    ...lastBot,
+                    sender: 'bot',
+                    name: effectiveName,
+                    characterName: effectiveName,
+                    text: '',
+                    avatar: currentCharacter.avatar,
+                    rerollGroupId: groupId,
+                    versionNumber: lastBot.versionNumber || 1,
+                    versionCount: lastBot.versionCount || 1,
+                    isLoading: true
+                };
+                saveChatHistory();
+                renderChatLog();
+            }
+
             setLoadingState(true);
             try {
                 const prompt = buildAIPromptForReroll();
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
-                const groupId = lastBot.rerollGroupId || 'group_' + Date.now();
 
-                if (!lastBot.rerollGroupId) {
-                    // Update den Original-Eintrag im globalen Array
-                    const originalIdx = chatHistory.findIndex(m => m === lastBot);
-                    if (originalIdx !== -1) {
-                        chatHistory[originalIdx].rerollGroupId = groupId;
-                        chatHistory[originalIdx].versionNumber = 1;
-                    }
+                if (originalIdx !== -1) {
+                    chatHistory[originalIdx] = {
+                        ...chatHistory[originalIdx],
+                        sender: 'bot',
+                        name: effectiveName,
+                        characterName: effectiveName,
+                        text: responseText.trim(),
+                        avatar: currentCharacter.avatar,
+                        rerollGroupId: groupId,
+                        versionNumber: (lastBot.versionNumber || 0) + 1,
+                        versionCount: (lastBot.versionCount || 1) + 1,
+                        isLoading: false
+                    };
                 }
 
-                const existingVersions = chatHistory.filter(msg => msg.rerollGroupId === groupId);
-                const nextVersion = existingVersions.length + 1;
-
-                const newMsg = {
-                    sender: 'bot',
-                    name: effectiveName,
-                    characterName: effectiveName,
-                    text: responseText.trim(),
-                    avatar: currentCharacter.avatar,
-                    rerollGroupId: groupId,
-                    versionNumber: nextVersion,
-                    versionCount: nextVersion
-                };
-                chatHistory.push(newMsg);
                 refreshRerollGroups();
-                setGroupDisplayVersion(groupId, nextVersion);
+                setGroupDisplayVersion(groupId, chatHistory[originalIdx].versionNumber);
                 saveChatHistory();
                 renderChatLog();
             } catch (error) {
                 console.error('AI Error:', error);
+                if (originalIdx !== -1) {
+                    chatHistory[originalIdx] = {
+                        ...chatHistory[originalIdx],
+                        sender: 'bot',
+                        name: effectiveName,
+                        characterName: effectiveName,
+                        text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
+                        avatar: currentCharacter.avatar,
+                        rerollGroupId: groupId,
+                        versionNumber: (lastBot.versionNumber || 0) + 1,
+                        versionCount: (lastBot.versionCount || 1) + 1,
+                        isLoading: false
+                    };
+                }
+                saveChatHistory();
+                renderChatLog();
                 alert(`AI Generation Error: ${error.message}`);
             } finally {
                 setLoadingState(false);
@@ -1377,17 +1410,17 @@
             
             const visibleMessages = chatHistory.filter(msg => isMessageVisible(msg));
             const effectiveName = getCharacterName();
-            const lastVisibleBotIndex = (() => {
+            const lastVisibleBotMessage = (() => {
                 for (let i = visibleMessages.length - 1; i >= 0; i--) {
-                    if (visibleMessages[i].sender === 'bot') return i;
+                    if (visibleMessages[i].sender === 'bot') return visibleMessages[i];
                 }
-                return -1;
+                return null;
             })();
 
             logArea.innerHTML = visibleMessages.map((msg, index) => {
                 const isUser = (msg.sender === 'user');
                 const formattedText = formatJanitorText(msg.text);
-                const isLastBot = !isUser && index === lastVisibleBotIndex;
+                const isLastBot = !isUser && msg === lastVisibleBotMessage;
                 const contentHtml = msg.isLoading ? `
                     <div class="msg-content msg-content-loading">
                         <div class="msg-loading-dots" aria-label="Loading response">
