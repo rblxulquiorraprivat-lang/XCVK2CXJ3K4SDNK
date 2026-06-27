@@ -1435,8 +1435,8 @@
                 // Index im originalen chatHistory-Array finden, um das korrekte Löschen zu triggern
                 const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
 
-                // Delete Button anzeigen nur, wenn gerade keine KI-Antwort generiert wird
-                const showDeleteBtn = !isWaitingForAI && (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
+                // Delete-Buttons nur für fertige Nachrichten zeigen; Lade-NPCs bleiben interaktionsfrei.
+                const showDeleteBtn = isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading);
                 const deleteBtnHtml = showDeleteBtn ? `
                     <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -1444,7 +1444,7 @@
                 ` : '';
 
                 const showRerollControls = isLastBot && !isUser && !introGroup && !msg.isLoading;
-                const showVersionControls = isLastBot && !isUser && groupVersions.length > 1;
+                const showVersionControls = isLastBot && !isUser && !msg.isLoading && groupVersions.length > 1;
                 
                 const versionControls = showVersionControls ? `
                         <div class="msg-variant-controls">
