@@ -1008,7 +1008,7 @@
                         if (msg.sender === 'bot' && !msg.characterName) {
                             return {
                                 ...msg,
-                                characterName: currentCharacter.characterName || currentCharacter.name
+                                characterName: getCharacterName()
                             };
                         }
                         return msg;
@@ -1099,6 +1099,8 @@
         }
 
         function deleteMessagePair(msgIndex) {
+            if (isWaitingForAI) return;
+
             if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
                 const targetMsg = chatHistory[msgIndex];
                 if (!targetMsg) return;
@@ -1147,29 +1149,23 @@
             }
         }
 
-        function buildAIPromptForReroll() {
-            const contextLimit = 10;
-            const visibleHistory = chatHistory.filter(msg => isMessageVisible(msg));
-            if (visibleHistory.length && visibleHistory[visibleHistory.length - 1].sender === 'bot') {
-                visibleHistory.pop();
-            }
-            const recentHistory = visibleHistory.slice(-contextLimit);
-            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+        function getCharacterName() {
+            const candidates = [
+                currentCharacter?.characterName,
+                currentCharacter?.character_name,
+                currentCharacter?.storyName,
+                currentCharacter?.story_name,
+                currentCharacter?.name
+            ];
+            const resolved = candidates.find(value => typeof value === 'string' && value.trim());
+            return resolved ? resolved.trim() : 'Character';
+        }
 
-            let prompt = `You are not roleplaying a character; you are ${effectiveName}.\n`;
-            prompt += `Name: ${effectiveName}.\n`;
-            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
-            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
-            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.\n`;
-            if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
-                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
-            }
-            prompt += `Description: ${currentCharacter.description}.\n`;
-            if (selectedPersona) {
-                prompt += `Persona: ${selectedPersona.name}.\n`;
-                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.\n`;
-                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.\n`;
-            }
+        function buildCharacterPrompt(historyMessages = [], { mode = 'reply' } = {}) {
+            const characterName = getCharacterName();
+            const contextLimit = 10;
+            const history = Array.isArray(historyMessages) ? historyMessages : chatHistory;
+            const recentHistory = history.filter(msg => !msg.isLoading).slice(-contextLimit);
 
             const textSizeInstruction = settings.textSize === 'Short'
                 ? 'Keep replies short and concise.'
@@ -1184,16 +1180,58 @@
                         ? 'Répondre en français.'
                         : 'Answer in English.';
 
-            prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
-            for (const msg of recentHistory) {
-                if (msg.sender === 'user') {
-                    prompt += `User: ${msg.text}\n`;
-                } else {
-                    prompt += `${currentCharacter.name}: ${msg.text}\n`;
-                }
+            const lines = [];
+            lines.push(`You are ${characterName}.`);
+            lines.push(`Character Name: ${characterName}`);
+            if (currentCharacter?.storyName && currentCharacter.storyName.trim() && currentCharacter.storyName.trim() !== characterName) {
+                lines.push(`Story Name: ${currentCharacter.storyName.trim()}`);
             }
-            prompt += `${currentCharacter.name}:`;
-            return prompt;
+            if (currentCharacter?.generally) lines.push(`General Character Traits: ${currentCharacter.generally}`);
+            if (currentCharacter?.appearance) lines.push(`Appearance: ${currentCharacter.appearance}`);
+            if (currentCharacter?.personality) lines.push(`Personality: ${currentCharacter.personality}`);
+            if (currentCharacter?.description) lines.push(`Description: ${currentCharacter.description}`);
+            if (Array.isArray(currentCharacter?.secrets) && currentCharacter.secrets.length) {
+                lines.push(`Secrets: ${currentCharacter.secrets.filter(Boolean).join('; ')}`);
+            }
+            if (selectedPersona) {
+                lines.push(`Active Persona: ${selectedPersona.name}`);
+                if (selectedPersona.generally) lines.push(`Persona Traits: ${selectedPersona.generally}`);
+                if (selectedPersona.appearance) lines.push(`Persona Appearance: ${selectedPersona.appearance}`);
+            }
+
+            lines.push('Conversation Rules: Stay fully in character at all times, speak naturally, and never break the fourth wall.');
+            lines.push(`If The User addresses you directly, respond as ${characterName}.`);
+            lines.push('When the conversation context mentions the player, label them as "The User".');
+            lines.push('Use vivid, immersive prose and keep the reply emotionally grounded.');
+            lines.push('Wrap spoken dialogue in double quotes. Use asterisks only for actions or expressions. Do not keep the asterisks in the final rendered text.');
+            lines.push(`Response Style: ${languageInstruction} ${textSizeInstruction}`);
+
+            if (mode === 'intro') {
+                lines.push(`Write an introductory greeting that feels like the first meeting with ${characterName}.`);
+            } else if (mode === 'reroll') {
+                lines.push(`Generate a fresh alternative reply as ${characterName}.`);
+            } else {
+                lines.push(`Answer the latest message from The User as ${characterName}.`);
+            }
+
+            lines.push('');
+            recentHistory.forEach(msg => {
+                if (msg.sender === 'user') {
+                    lines.push(`The User: ${msg.text}`);
+                } else {
+                    lines.push(`${characterName}: ${msg.text}`);
+                }
+            });
+            lines.push(`${characterName}:`);
+            return lines.join('\n');
+        }
+
+        function buildAIPromptForReroll() {
+            const visibleHistory = chatHistory.filter(msg => isMessageVisible(msg));
+            if (visibleHistory.length && visibleHistory[visibleHistory.length - 1].sender === 'bot') {
+                visibleHistory.pop();
+            }
+            return buildCharacterPrompt(visibleHistory, { mode: 'reroll' });
         }
 
         function getLastVisibleBotMessage() {
@@ -1209,7 +1247,7 @@
             const lastBot = getLastVisibleBotMessage();
             if (!lastBot) return;
 
-            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+            const effectiveName = getCharacterName();
             if (lastBot.rerollGroupId && String(lastBot.rerollGroupId).endsWith('_intro')) {
                 return;
             }
@@ -1217,7 +1255,7 @@
             setLoadingState(true);
             try {
                 const prompt = buildAIPromptForReroll();
-                const responseText = await perchanceBridge.generateText(prompt, ['User:', '\nUser:']);
+                const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
                 const groupId = lastBot.rerollGroupId || 'group_' + Date.now();
 
                 if (!lastBot.rerollGroupId) {
@@ -1338,6 +1376,7 @@
             const logArea = document.getElementById('storyLog');
             
             const visibleMessages = chatHistory.filter(msg => isMessageVisible(msg));
+            const effectiveName = getCharacterName();
             const lastVisibleBotIndex = (() => {
                 for (let i = visibleMessages.length - 1; i >= 0; i--) {
                     if (visibleMessages[i].sender === 'bot') return i;
@@ -1363,8 +1402,8 @@
                 // Index im originalen chatHistory-Array finden, um das korrekte Löschen zu triggern
                 const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
 
-                // Delete Button anzeigen (nur für Bots und NICHT die Einleitung)
-                const showDeleteBtn = (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
+                // Delete Button anzeigen nur, wenn gerade keine KI-Antwort generiert wird
+                const showDeleteBtn = !isWaitingForAI && (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
                 const deleteBtnHtml = showDeleteBtn ? `
                     <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
@@ -1384,13 +1423,17 @@
                 const rerollButton = showRerollControls ? `
                         <button type="button" class="control-btn control-btn-compact" onclick="rerollLatestBotMessage()" title="Neue Variante erzeugen">↻</button>
                     ` : '';
-                const controlRow = (versionControls || rerollButton) ? `
+                const continueButton = showRerollControls ? `
+                        <button type="button" class="control-btn control-btn-compact" onclick="continueConversation()" title="Continue">C</button>
+                    ` : '';
+                const controlRow = (versionControls || rerollButton || continueButton) ? `
                         <div class="msg-reroll-row">
                             ${versionControls}
                             ${rerollButton}
+                            ${continueButton}
                         </div>
                     ` : '';
-                const displayName = isUser ? 'Du' : (msg.characterName || currentCharacter.characterName || msg.name || currentCharacter.name);
+                const displayName = isUser ? 'Du' : (msg.characterName || effectiveName || msg.name || currentCharacter.name);
                 
                 return `
                     <div class="msg-wrapper ${isUser ? 'user-msg-wrapper' : 'bot-msg-wrapper'}">
@@ -1411,54 +1454,30 @@
         }
 
         function buildAIPrompt() {
-            let prompt = `You are not roleplaying a character; you are ${currentCharacter.name}.\n`;
-            prompt += `Name: ${currentCharacter.name}.\n`;
-            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
-            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
-            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.\n`;
-            if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
-                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
-            }
-            prompt += `Description: ${currentCharacter.description}.\n`;
-            if (selectedPersona) {
-                prompt += `Persona: ${selectedPersona.name}.\n`;
-                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.\n`;
-                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.\n`;
-            }
+            return buildCharacterPrompt(chatHistory, { mode: 'reply' });
+        }
 
-            const textSizeInstruction = settings.textSize === 'Short'
-                ? 'Keep replies short and concise.'
-                : settings.textSize === 'Long'
-                    ? 'Use longer, more detailed replies.'
-                    : 'Use moderate response length.';
-            const languageInstruction = settings.language === 'German'
-                ? 'Antworten auf Deutsch.'
-                : settings.language === 'Spanish'
-                    ? 'Responde en español.'
-                    : settings.language === 'French'
-                        ? 'Répondre en français.'
-                        : 'Answer in English.';
+        async function continueConversation() {
+            if (isWaitingForAI) return;
 
-            prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
-            prompt += `When speaking, wrap spoken text in double quotes. Use asterisks only to mark actions or expressions. The final output should not keep the asterisks in the rendered text.\n\n`;
+            const pendingMsg = addPendingBotMessage();
+            setLoadingState(true);
 
-            const contextLimit = 10;
-            const recentHistory = chatHistory.slice(-contextLimit);
-            
-            for (const msg of recentHistory) {
-                if (msg.sender === 'user') {
-                    prompt += `User: ${msg.text}\n`;
-                } else {
-                    prompt += `${currentCharacter.name}: ${msg.text}\n`;
-                }
+            try {
+                const prompt = buildAIPrompt();
+                const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
+                finalizePendingBotMessage(pendingMsg, responseText.trim());
+            } catch (error) {
+                console.error('AI Error:', error);
+                finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
+                alert(`AI Generation Error: ${error.message}`);
+            } finally {
+                setLoadingState(false);
             }
-            
-            prompt += `${currentCharacter.name}:`;
-            return prompt;
         }
 
         function addPendingBotMessage() {
-            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+            const effectiveName = getCharacterName();
             const pendingMsg = {
                 sender: 'bot',
                 name: effectiveName,
@@ -1488,39 +1507,10 @@
         async function generateInitialGreeting() {
             setLoadingState(true);
             const pendingMsg = addPendingBotMessage();
-            const textSizeInstruction = settings.textSize === 'Short'
-                ? 'Keep replies short and concise.'
-                : settings.textSize === 'Long'
-                    ? 'Use longer, more detailed replies.'
-                    : 'Use moderate response length.';
-            const languageInstruction = settings.language === 'German'
-                ? 'Antworten auf Deutsch.'
-                : settings.language === 'Spanish'
-                    ? 'Responde en español.'
-                    : settings.language === 'French'
-                        ? 'Répondre en français.'
-                        : 'Answer in English.';
-            
-            let prompt = `You are not roleplaying a character; you are ${currentCharacter.name}.\n`;
-            prompt += `Name: ${currentCharacter.name}.\n`;
-            if (currentCharacter.generally) prompt += `Generally: ${currentCharacter.generally}.\n`;
-            if (currentCharacter.appearance) prompt += `Appearance: ${currentCharacter.appearance}.\n`;
-            if (currentCharacter.personality) prompt += `Personality: ${currentCharacter.personality}.\n`;
-            if (Array.isArray(currentCharacter.secrets) && currentCharacter.secrets.length) {
-                prompt += `Secrets: ${currentCharacter.secrets.join('; ')}.\n`;
-            }
-            prompt += `Description: ${currentCharacter.description}.\n`;
-            if (selectedPersona) {
-                prompt += `Persona: ${selectedPersona.name}.\n`;
-                if (selectedPersona.generally) prompt += `Persona generally: ${selectedPersona.generally}.\n`;
-                if (selectedPersona.appearance) prompt += `Persona appearance: ${selectedPersona.appearance}.\n`;
-            }
-            prompt += `${languageInstruction} ${textSizeInstruction}\n\n`;
-            prompt += `Write an introductory greeting as ${currentCharacter.name}. Wrap spoken sentences in double quotes. Use asterisks only for actions or expressions, and do not keep them in the final output.`;
-            
-            const effectiveName = currentCharacter.characterName || currentCharacter.name;
+            const prompt = buildCharacterPrompt(chatHistory, { mode: 'intro' });
+
             try {
-                const responseText = await perchanceBridge.generateText(prompt, ['User:']);
+                const responseText = await perchanceBridge.generateText(prompt, ['The User:']);
                 
                 finalizePendingBotMessage(pendingMsg, responseText.trim());
                 chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
