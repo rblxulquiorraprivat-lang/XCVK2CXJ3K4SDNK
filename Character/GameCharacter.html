@@ -1298,20 +1298,20 @@
             if (!currentCharacter) return;
 
             const existingMemories = loadMemories();
-            if (existingMemories.length) {
-                memories = existingMemories;
-                return;
-            }
+            memories = Array.isArray(existingMemories) ? existingMemories : [];
 
-            const seenTexts = new Set();
-            memories = [];
+            const seenKeys = new Set(
+                memories.map(memory => `${String(memory.sender || '').toLowerCase()}:${String(memory.text || '').trim().toLowerCase()}`)
+            );
 
             chatHistory.forEach((msg, index) => {
                 if (msg.isLoading || !msg.text || !String(msg.text).trim()) return;
-                const normalized = String(msg.text).trim().toLowerCase();
-                if (seenTexts.has(normalized)) return;
 
-                seenTexts.add(normalized);
+                const normalizedText = String(msg.text).trim().toLowerCase();
+                const memoryKey = `${String(msg.sender || '').toLowerCase()}:${normalizedText}`;
+                if (seenKeys.has(memoryKey)) return;
+
+                seenKeys.add(memoryKey);
                 memories.push({
                     id: `legacy_${index}_${Date.now()}`,
                     sender: msg.sender,
@@ -1326,8 +1326,13 @@
         function storeMessageAsMemory(msg) {
             if (!msg || msg.isLoading || !msg.text || !String(msg.text).trim()) return;
 
-            const normalized = String(msg.text).trim().toLowerCase();
-            const alreadyStored = memories.some(memory => String(memory.text).trim().toLowerCase() === normalized);
+            const normalizedText = String(msg.text).trim().toLowerCase();
+            const senderKey = String(msg.sender || '').toLowerCase();
+            const memoryKey = `${senderKey}:${normalizedText}`;
+            const alreadyStored = memories.some(memory => {
+                const existingKey = `${String(memory.sender || '').toLowerCase()}:${String(memory.text || '').trim().toLowerCase()}`;
+                return existingKey === memoryKey;
+            });
             if (alreadyStored) return;
 
             memories.push({
