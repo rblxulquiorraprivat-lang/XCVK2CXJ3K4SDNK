@@ -1724,6 +1724,13 @@
             setLoadingState(true);
 
             try {
+                const targetMemoryText = String(lastBot.text || '').trim().toLowerCase();
+                memories = memories.filter(memory => {
+                    const memoryText = String(memory?.text || '').trim().toLowerCase();
+                    return memoryText !== targetMemoryText;
+                });
+                saveMemories();
+
                 const prompt = buildAIPromptForReroll(lastBot);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
                 const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
