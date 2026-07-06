@@ -1412,24 +1412,32 @@
             if (!memories.length) return [];
 
             const contextMessages = Array.isArray(historyMessages) ? historyMessages : chatHistory;
-            const recentMemories = memories.slice(-3);
-            const olderPool = memories.slice(0, Math.max(0, memories.length - 3));
-            const cutoffIndex = Math.max(0, memories.length - 10);
-            const eligibleOlder = olderPool.filter((_, index) => index < cutoffIndex);
+            const recentActiveMessages = contextMessages
+                .filter(msg => msg && !msg.isLoading && typeof msg.text === 'string' && String(msg.text).trim())
+                .slice(-12);
+
+            const excludedMemoryTexts = new Set(
+                recentActiveMessages.map(msg => String(msg.text || '').trim().toLowerCase())
+            );
+
+            const pool = memories.filter(memory => {
+                const text = String(memory?.text || '').trim().toLowerCase();
+                return text && !excludedMemoryTexts.has(text);
+            });
 
             const selectedOlder = [];
-            const usedIds = new Set(recentMemories.map(memory => memory.id));
-            const pool = [...eligibleOlder].filter(memory => !usedIds.has(memory.id));
+            const remainingPool = [...pool];
 
-            while (selectedOlder.length < 3 && pool.length) {
-                const randomIndex = Math.floor(Math.random() * pool.length);
-                const nextMemory = pool.splice(randomIndex, 1)[0];
+            while (selectedOlder.length < 3 && remainingPool.length) {
+                const randomIndex = Math.floor(Math.random() * remainingPool.length);
+                const nextMemory = remainingPool.splice(randomIndex, 1)[0];
                 selectedOlder.push(nextMemory);
-                usedIds.add(nextMemory.id);
             }
 
-            const baseMemories = [...recentMemories, ...selectedOlder];
-            const recentUserMessages = contextMessages.filter(msg => msg.sender === 'user').slice(-3);
+            const recentUserMessages = contextMessages
+                .filter(msg => msg && msg.sender === 'user' && !msg.isLoading && typeof msg.text === 'string' && String(msg.text).trim())
+                .slice(-3);
+
             const keywordMatches = recentUserMessages.flatMap(userMessage => {
                 const message = String(userMessage?.text || '').toLowerCase();
                 if (!message) return [];
@@ -1439,16 +1447,16 @@
                 if (!matchedKeywords.length) return [];
 
                 return memories.filter(memory => {
-                    const text = String(memory.text || '').toLowerCase();
-                    return matchedKeywords.some(keyword => text.includes(keyword));
+                    const text = String(memory?.text || '').toLowerCase();
+                    return !excludedMemoryTexts.has(text) && matchedKeywords.some(keyword => text.includes(keyword));
                 }).slice(0, 3);
             });
 
-            const combined = [...baseMemories, ...keywordMatches].filter((memory, index, self) =>
-                self.findIndex(candidate => candidate.id === memory.id) === index
+            const combined = [...selectedOlder, ...keywordMatches].filter((memory, index, self) =>
+                memory && self.findIndex(candidate => candidate.id === memory.id) === index
             );
 
-            return combined.slice(0, 9);
+            return combined.slice(0, 3);
         }
 
         async function initializeIntroductoryChat() {
@@ -1574,7 +1582,7 @@
 
         function buildCharacterPrompt(historyMessages = [], { mode = 'reply' } = {}) {
             const characterName = getCharacterName();
-            const contextLimit = 10;
+            const contextLimit = 12;
             const history = Array.isArray(historyMessages) ? historyMessages : chatHistory;
             const recentHistory = history.filter(msg => !msg.isLoading).slice(-contextLimit);
             const memoryContext = getRelevantMemories(history);
