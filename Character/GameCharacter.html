@@ -1677,12 +1677,20 @@
             return lines.join('\n');
         }
 
-        function buildAIPromptForReroll() {
-            const visibleHistory = chatHistory.filter(msg => isMessageVisible(msg));
-            if (visibleHistory.length && visibleHistory[visibleHistory.length - 1].sender === 'bot') {
-                visibleHistory.pop();
+        function buildAIPromptForReroll(targetMessage = null) {
+            const history = Array.isArray(chatHistory) ? chatHistory : [];
+            let targetIndex = -1;
+
+            if (targetMessage) {
+                targetIndex = history.findIndex(msg => msg === targetMessage);
             }
-            return buildCharacterPrompt(visibleHistory, { mode: 'reroll' });
+
+            if (targetIndex === -1) {
+                targetIndex = history.length;
+            }
+
+            const historyBeforeTarget = history.slice(0, targetIndex).filter(msg => !msg.isLoading);
+            return buildCharacterPrompt(historyBeforeTarget, { mode: 'reroll' });
         }
 
         function getLastVisibleBotMessage() {
@@ -1705,65 +1713,60 @@
 
             const groupId = lastBot.rerollGroupId || 'group_' + Date.now();
             const originalIdx = chatHistory.findIndex(m => m === lastBot);
+            if (originalIdx === -1) return;
 
-            if (originalIdx !== -1) {
-                chatHistory[originalIdx] = {
-                    ...lastBot,
-                    sender: 'bot',
-                    name: effectiveName,
-                    characterName: effectiveName,
-                    text: '',
-                    avatar: currentCharacter.avatar,
-                    rerollGroupId: groupId,
-                    versionNumber: lastBot.versionNumber || 1,
-                    versionCount: lastBot.versionCount || 1,
-                    isLoading: true
-                };
-                saveChatHistory();
-                renderChatLog();
-            }
+            const nextVersionNumber = (lastBot.versionNumber || 1) + 1;
+            const nextVersionCount = (lastBot.versionCount || 1) + 1;
+            const pendingMessage = {
+                ...lastBot,
+                id: generateMessageId(chatHistory.length),
+                sender: 'bot',
+                name: effectiveName,
+                characterName: effectiveName,
+                text: '',
+                avatar: currentCharacter.avatar,
+                rerollGroupId: groupId,
+                versionNumber: nextVersionNumber,
+                versionCount: nextVersionCount,
+                isLoading: true,
+                isReroll: true
+            };
 
+            chatHistory.push(pendingMessage);
+            saveChatHistory();
+            renderChatLog();
             setLoadingState(true);
-            try {
-                const prompt = buildAIPromptForReroll();
-                const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
 
-                if (originalIdx !== -1) {
-                    chatHistory[originalIdx] = {
-                        ...chatHistory[originalIdx],
-                        sender: 'bot',
-                        name: effectiveName,
-                        characterName: effectiveName,
+            try {
+                const prompt = buildAIPromptForReroll(lastBot);
+                const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
+                const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
+
+                if (pendingIndex !== -1) {
+                    chatHistory[pendingIndex] = {
+                        ...pendingMessage,
                         text: responseText.trim(),
-                        avatar: currentCharacter.avatar,
-                        rerollGroupId: groupId,
-                        versionNumber: (lastBot.versionNumber || 0) + 1,
-                        versionCount: (lastBot.versionCount || 1) + 1,
                         isLoading: false
                     };
-                    storeMessageAsMemory(chatHistory[originalIdx]);
+                    storeMessageAsMemory(chatHistory[pendingIndex]);
                 }
 
                 refreshRerollGroups();
-                setGroupDisplayVersion(groupId, chatHistory[originalIdx].versionNumber);
+                setGroupDisplayVersion(groupId, nextVersionNumber);
                 saveChatHistory();
                 renderChatLog();
             } catch (error) {
                 console.error('AI Error:', error);
-                if (originalIdx !== -1) {
-                    chatHistory[originalIdx] = {
-                        ...chatHistory[originalIdx],
-                        sender: 'bot',
-                        name: effectiveName,
-                        characterName: effectiveName,
+                const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
+                if (pendingIndex !== -1) {
+                    chatHistory[pendingIndex] = {
+                        ...pendingMessage,
                         text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
-                        avatar: currentCharacter.avatar,
-                        rerollGroupId: groupId,
-                        versionNumber: (lastBot.versionNumber || 0) + 1,
-                        versionCount: (lastBot.versionCount || 1) + 1,
                         isLoading: false
                     };
                 }
+                refreshRerollGroups();
+                setGroupDisplayVersion(groupId, nextVersionNumber);
                 saveChatHistory();
                 renderChatLog();
                 alert(`AI Generation Error: ${error.message}`);
@@ -1883,8 +1886,8 @@
                 // Index im originalen chatHistory-Array finden, um das korrekte Löschen zu triggern
                 const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
 
-                // Delete-Buttons nur für fertige Nachrichten zeigen; Lade-NPCs bleiben interaktionsfrei.
-                const showDeleteBtn = isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading);
+                // Delete-Buttons nur anzeigen, wenn gerade keine KI-Antwort generiert wird.
+                const showDeleteBtn = !isWaitingForAI && (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
                 const deleteBtnHtml = showDeleteBtn ? `
                     <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
