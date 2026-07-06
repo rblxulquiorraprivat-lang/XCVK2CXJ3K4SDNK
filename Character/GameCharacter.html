@@ -1974,6 +1974,9 @@
                 characterName: effectiveName,
                 text: '',
                 avatar: currentCharacter.avatar,
+                rerollGroupId: 'group_' + Date.now(),
+                versionNumber: 1,
+                versionCount: 1,
                 isLoading: true
             };
             chatHistory.push(pendingMsg);
@@ -2080,6 +2083,8 @@
                 chatInput.disabled = false;
                 chatInput.focus();
             }
+
+            renderChatLog();
         }
 
         function autoGrowTextarea(element) {
