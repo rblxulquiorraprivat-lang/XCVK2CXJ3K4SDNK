@@ -1538,43 +1538,21 @@
             }
 
             if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
-                let indicesToRemove = [msgIndex];
+                const indicesToRemove = new Set([msgIndex]);
 
                 if (targetMsg.sender === 'bot') {
-                    if (targetMsg.rerollGroupId) {
-                        chatHistory.forEach((msg, idx) => {
-                            if (msg.rerollGroupId === targetMsg.rerollGroupId && idx !== msgIndex) {
-                                indicesToRemove.push(idx);
-                            }
-                        });
-                    }
-
-                    let userMsgIndex = -1;
-                    for (let i = msgIndex - 1; i >= 0; i--) {
-                        if (chatHistory[i].sender === 'user') {
-                            userMsgIndex = i;
-                            break;
-                        }
-                    }
-
-                    if (userMsgIndex !== -1) {
-                        indicesToRemove.push(userMsgIndex);
+                    const previousMsg = chatHistory[msgIndex - 1];
+                    if (previousMsg && previousMsg.sender === 'user') {
+                        indicesToRemove.add(msgIndex - 1);
                     }
                 } else if (targetMsg.sender === 'user') {
-                    let botMsgIndex = -1;
-                    for (let i = msgIndex + 1; i < chatHistory.length; i++) {
-                        if (chatHistory[i].sender === 'bot') {
-                            botMsgIndex = i;
-                            break;
-                        }
-                    }
-
-                    if (botMsgIndex !== -1) {
-                        indicesToRemove.push(botMsgIndex);
+                    const nextMsg = chatHistory[msgIndex + 1];
+                    if (nextMsg && nextMsg.sender === 'bot') {
+                        indicesToRemove.add(msgIndex + 1);
                     }
                 }
 
-                chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.includes(idx));
+                chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.has(idx));
 
                 refreshRerollGroups();
                 saveChatHistory();
@@ -1715,8 +1693,16 @@
             const originalIdx = chatHistory.findIndex(m => m === lastBot);
             if (originalIdx === -1) return;
 
+            if (!lastBot.rerollGroupId) {
+                lastBot.rerollGroupId = groupId;
+                lastBot.versionNumber = 1;
+                lastBot.versionCount = 1;
+            }
+
             const nextVersionNumber = (lastBot.versionNumber || 1) + 1;
             const nextVersionCount = (lastBot.versionCount || 1) + 1;
+            setGroupDisplayVersion(groupId, lastBot.versionNumber || 1);
+
             const pendingMessage = {
                 ...lastBot,
                 id: generateMessageId(chatHistory.length),
