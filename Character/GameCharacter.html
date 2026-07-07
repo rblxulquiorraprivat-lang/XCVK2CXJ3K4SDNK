@@ -5,33 +5,137 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Immersive Chat</title>
     <script>
+        const BRIDGE_MESSAGE_TIMEOUT_MS = 20000;
+
+        function getBridgeMessageOrigins() {
+            const origins = new Set();
+            try {
+                const referrer = document.referrer;
+                if (referrer) {
+                    const parsedReferrer = new URL(referrer);
+                    if (parsedReferrer.origin) origins.add(parsedReferrer.origin);
+                }
+            } catch (_) {}
+            try {
+                if (window.location.ancestorOrigins && window.location.ancestorOrigins.length) {
+                    for (let i = 0; i < window.location.ancestorOrigins.length; i++) {
+                        origins.add(window.location.ancestorOrigins[i]);
+                    }
+                }
+            } catch (_) {}
+            origins.add(window.location.origin);
+            return [...origins];
+        }
+
+        function isBridgeMessageOriginAllowed(origin) {
+            if (!origin) return false;
+            const allowedOrigins = getBridgeMessageOrigins();
+            if (allowedOrigins.includes(origin)) return true;
+            try {
+                const parsed = new URL(origin);
+                return parsed.hostname.endsWith('.perchance.org') || parsed.hostname === 'perchance.org' || parsed.hostname.endsWith('github.io');
+            } catch (_) {
+                return false;
+            }
+        }
+
+        function getBridgeTargets() {
+            const targets = [];
+            if (window.parent && window.parent !== window && !targets.some(target => target === window.parent)) {
+                targets.push(window.parent);
+            }
+            if (window.top && window.top !== window && !targets.some(target => target === window.top)) {
+                targets.push(window.top);
+            }
+            if (window.opener && !targets.some(target => target === window.opener)) {
+                targets.push(window.opener);
+            }
+            return targets;
+        }
+
+        function safePostBridgeMessage(payload, preferredOrigin = null) {
+            const targets = getBridgeTargets();
+            if (!targets.length) return false;
+
+            const candidateOrigins = [];
+            if (preferredOrigin) candidateOrigins.push(preferredOrigin);
+            candidateOrigins.push('*');
+
+            for (const target of targets) {
+                for (const origin of candidateOrigins) {
+                    try {
+                        target.postMessage(payload, origin);
+                        return true;
+                    } catch (err) {
+                        console.warn('Bridge postMessage failed:', err);
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        function getFriendlyAiErrorMessage(error) {
+            const raw = error && (error.message || String(error)) ? String(error.message || error) : '';
+            const text = raw.toLowerCase();
+            const isBridgeIssue = /(400|bad request|turnstile|captcha|private access token|cloudflare|blocked|timeout|fetch|network|aborted|postmessage|origin)/i.test(text);
+            return isBridgeIssue ? 'Verbindung zum KI-Server blockiert' : (raw || 'Verbindung zum KI-Server blockiert');
+        }
+
         // Fake AI object for the UI to use while waiting for the bridge
         const perchanceBridge = {
             async generateText(instruction, stopSequences) {
                 return new Promise((resolve, reject) => {
                     const requestId = 'req_' + Date.now() + '_' + Math.random().toString(36).substring(7);
-                    
+                    let settled = false;
+
+                    const cleanup = () => {
+                        window.removeEventListener('message', handleMessage);
+                        window.clearTimeout(timeoutId);
+                    };
+
                     const handleMessage = (event) => {
                         if (!event.data || typeof event.data !== 'object') return;
-                        if (event.data.requestId === requestId) {
-                            window.removeEventListener('message', handleMessage);
-                            if (event.data.type === 'AI_RESPONSE') {
-                                resolve(event.data.text);
-                            } else if (event.data.type === 'AI_ERROR') {
-                                reject(new Error(event.data.error));
+                        if (event.data.requestId !== requestId) return;
+                        if (!isBridgeMessageOriginAllowed(event.origin)) return;
+                        if (settled) return;
+
+                        settled = true;
+                        cleanup();
+                        if (event.data.type === 'AI_RESPONSE') {
+                            const responseText = typeof event.data.text === 'string' ? event.data.text : '';
+                            if (!responseText || !String(responseText).trim()) {
+                                reject(new Error('Verbindung zum KI-Server blockiert'));
+                            } else {
+                                resolve(responseText);
                             }
+                        } else if (event.data.type === 'AI_ERROR') {
+                            reject(new Error(getFriendlyAiErrorMessage(new Error(event.data.error || 'AI bridge error'))));
                         }
                     };
-                    
+
+                    const timeoutId = window.setTimeout(() => {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        reject(new Error('Verbindung zum KI-Server blockiert'));
+                    }, BRIDGE_MESSAGE_TIMEOUT_MS);
+
                     window.addEventListener('message', handleMessage);
-                    
-                    // Send request to parent window (where the Perchance AI plugin lives)
-                    window.parent.postMessage({
+
+                    const sent = safePostBridgeMessage({
                         type: 'AI_REQUEST',
                         requestId: requestId,
                         instruction: instruction,
                         stopSequences: stopSequences
-                    }, '*');
+                    }, window.location.origin);
+
+                    if (!sent) {
+                        if (settled) return;
+                        settled = true;
+                        cleanup();
+                        reject(new Error('Verbindung zum KI-Server blockiert'));
+                    }
                 });
             }
         };
@@ -1867,15 +1971,19 @@
                 let prompt = buildAIPromptForReroll(lastBot);
                 prompt = await injectOramaContext(prompt);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
+                const normalizedResponse = String(responseText || '').trim();
+                if (!normalizedResponse) {
+                    throw new Error('Verbindung zum KI-Server blockiert');
+                }
                 try {
-                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: responseText.trim() });
+                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
                 } catch (e) { /* ignore */ }
                 const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
 
                 if (pendingIndex !== -1) {
                     chatHistory[pendingIndex] = {
                         ...pendingMessage,
-                        text: responseText.trim(),
+                        text: normalizedResponse,
                         isLoading: false
                     };
                     storeMessageAsMemory(chatHistory[pendingIndex]);
@@ -1887,11 +1995,12 @@
                 renderChatLog();
             } catch (error) {
                 console.error('AI Error:', error);
+                const friendlyMessage = getFriendlyAiErrorMessage(error);
                 const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
                 if (pendingIndex !== -1) {
                     chatHistory[pendingIndex] = {
                         ...pendingMessage,
-                        text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
+                        text: friendlyMessage,
                         isLoading: false
                     };
                 }
@@ -1899,7 +2008,9 @@
                 setGroupDisplayVersion(groupId, nextVersionNumber);
                 saveChatHistory();
                 renderChatLog();
-                alert(`AI Generation Error: ${error.message}`);
+                if (friendlyMessage !== 'Verbindung zum KI-Server blockiert') {
+                    alert(`AI Generation Error: ${error.message}`);
+                }
             } finally {
                 setLoadingState(false);
             }
@@ -2087,6 +2198,12 @@
             if (userMessages.length === 0) return basePrompt;
 
             const lastUserText = userMessages[userMessages.length - 1].text;
+            const recentVisibleMessages = chatHistory.filter(msg => msg && isMessageVisible(msg)).slice(-12);
+            const recentVisibleTextKeys = new Set(
+                recentVisibleMessages
+                    .map(msg => String(msg?.text || '').trim().toLowerCase())
+                    .filter(Boolean)
+            );
 
             try {
                 const searchResults = await oramaSearch(oramaDB, { term: lastUserText, limit: 3, tolerance: 1 });
@@ -2094,7 +2211,11 @@
 
                 if (hits.length > 0) {
                     let memoryContext = '\n[Wichtige Erinnerungen an frühere Ereignisse im Chat]:\n';
-                    const memoryEntries = hits.map(hit => hit?.document?.content || hit?.content || '').filter(Boolean).slice(0, 3);
+                    const memoryEntries = hits
+                        .map(hit => hit?.document?.content || hit?.content || '')
+                        .filter(Boolean)
+                        .filter(entry => !recentVisibleTextKeys.has(String(entry).trim().toLowerCase()))
+                        .slice(0, 3);
                     if (memoryEntries.length) {
                         memoryContext += memoryEntries.map(entry => `- ${entry}`).join('\n');
                         return `${memoryContext}\n\n${basePrompt}`;
@@ -2115,14 +2236,21 @@
                 let prompt = buildAIPrompt();
                 prompt = await injectOramaContext(prompt);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
+                const normalizedResponse = String(responseText || '').trim();
+                if (!normalizedResponse) {
+                    throw new Error('Verbindung zum KI-Server blockiert');
+                }
                 try {
-                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: responseText.trim() });
+                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
                 } catch (e) { /* ignore */ }
-                finalizePendingBotMessage(pendingMsg, responseText.trim());
+                finalizePendingBotMessage(pendingMsg, normalizedResponse);
             } catch (error) {
                 console.error('AI Error:', error);
-                finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
-                alert(`AI Generation Error: ${error.message}`);
+                const friendlyMessage = getFriendlyAiErrorMessage(error);
+                finalizePendingBotMessage(pendingMsg, friendlyMessage);
+                if (friendlyMessage !== 'Verbindung zum KI-Server blockiert') {
+                    alert(`AI Generation Error: ${error.message}`);
+                }
             } finally {
                 setLoadingState(false);
             }
@@ -2167,11 +2295,15 @@
 
             try {
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:']);
+                const normalizedResponse = String(responseText || '').trim();
+                if (!normalizedResponse) {
+                    throw new Error('Verbindung zum KI-Server blockiert');
+                }
                 
-                finalizePendingBotMessage(pendingMsg, responseText.trim());
+                finalizePendingBotMessage(pendingMsg, normalizedResponse);
                 chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
                     ...msg,
-                    text: responseText.trim(),
+                    text: normalizedResponse,
                     isLoading: false,
                     isIntro: true
                 } : msg);
@@ -2179,10 +2311,11 @@
                 renderChatLog();
             } catch (error) {
                 console.error("AI Error:", error);
-                finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
+                const friendlyMessage = getFriendlyAiErrorMessage(error);
+                finalizePendingBotMessage(pendingMsg, friendlyMessage);
                 chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
                     ...msg,
-                    text: `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`,
+                    text: friendlyMessage,
                     isLoading: false,
                     isIntro: true
                 } : msg);
@@ -2245,16 +2378,23 @@
                 }
 
                 const aiResponse = await perchanceBridge.generateText(instruction, ['User:', '\nUser:']);
+                const normalizedResponse = String(aiResponse || '').trim();
+                if (!normalizedResponse) {
+                    throw new Error('Verbindung zum KI-Server blockiert');
+                }
 
                 try {
-                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: aiResponse });
+                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
                 } catch (e) { /* ignore */ }
 
-                finalizePendingBotMessage(pendingMsg, aiResponse.trim());
+                finalizePendingBotMessage(pendingMsg, normalizedResponse);
             } catch (error) {
                 console.error("AI Error:", error);
-                finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
-                alert(`AI Generation Error: ${error.message}`);
+                const friendlyMessage = getFriendlyAiErrorMessage(error);
+                finalizePendingBotMessage(pendingMsg, friendlyMessage);
+                if (friendlyMessage !== 'Verbindung zum KI-Server blockiert') {
+                    alert(`AI Generation Error: ${error.message}`);
+                }
             } finally {
                 setLoadingState(false);
             }
