@@ -1297,26 +1297,23 @@
         function syncMemoriesFromChatHistory() {
             if (!currentCharacter) return;
 
-            const existingMemories = loadMemories();
-            memories = Array.isArray(existingMemories) ? existingMemories : [];
+            memories = [];
+            const visibleMessages = chatHistory.filter(msg => isMessageVisible(msg));
+            const seenKeys = new Set();
 
-            const seenKeys = new Set(
-                memories.map(memory => `${String(memory.sender || '').toLowerCase()}:${String(memory.text || '').trim().toLowerCase()}`)
-            );
+            visibleMessages.forEach((msg, index) => {
+                if (!msg || msg.isLoading || !msg.text || !String(msg.text).trim()) return;
 
-            chatHistory.forEach((msg, index) => {
-                if (msg.isLoading || !msg.text || !String(msg.text).trim()) return;
-
-                const normalizedText = String(msg.text).trim().toLowerCase();
-                const memoryKey = `${String(msg.sender || '').toLowerCase()}:${normalizedText}`;
+                const text = String(msg.text).trim();
+                const memoryKey = `${String(msg.sender || '').toLowerCase()}:${text.toLowerCase()}`;
                 if (seenKeys.has(memoryKey)) return;
 
                 seenKeys.add(memoryKey);
                 memories.push({
-                    id: `legacy_${index}_${Date.now()}`,
+                    id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
                     sender: msg.sender,
-                    text: String(msg.text).trim(),
-                    timestamp: msg.timestamp || Date.now() - ((chatHistory.length - index) * 1000)
+                    text: text,
+                    timestamp: msg.timestamp || Date.now() - ((visibleMessages.length - index) * 1000)
                 });
             });
 
@@ -1412,8 +1409,9 @@
             if (!memories.length) return [];
 
             const contextMessages = Array.isArray(historyMessages) ? historyMessages : chatHistory;
-            const recentActiveMessages = contextMessages
-                .filter(msg => msg && !msg.isLoading && typeof msg.text === 'string' && String(msg.text).trim())
+            const visibleContextMessages = contextMessages.filter(msg => msg && isMessageVisible(msg));
+            const recentActiveMessages = visibleContextMessages
+                .filter(msg => !msg.isLoading && typeof msg.text === 'string' && String(msg.text).trim())
                 .slice(-12);
 
             const excludedMemoryTexts = new Set(
@@ -1434,9 +1432,8 @@
                 selectedOlder.push(nextMemory);
             }
 
-            const recentUserMessages = contextMessages
-                .filter(msg => msg && msg.sender === 'user' && !msg.isLoading && typeof msg.text === 'string' && String(msg.text).trim())
-                .slice(-3);
+            const recentUserMessages = recentActiveMessages
+                .filter(msg => msg.sender === 'user');
 
             const keywordMatches = recentUserMessages.flatMap(userMessage => {
                 const message = String(userMessage?.text || '').toLowerCase();
@@ -1787,6 +1784,7 @@
             if (next < 1) next = 1;
             if (next > versions.length) next = versions.length;
             setGroupDisplayVersion(groupId, next);
+            syncMemoriesFromChatHistory();
             renderChatLog();
         }
 
@@ -1923,7 +1921,9 @@
                             ${continueButton}
                         </div>
                     ` : '';
-                const displayName = isUser ? 'Du' : (msg.characterName || effectiveName || msg.name || currentCharacter.name);
+                const displayName = isUser
+                    ? (selectedPersona && selectedPersona.name ? selectedPersona.name : 'Du')
+                    : (msg.characterName || effectiveName || msg.name || currentCharacter.name);
                 
                 return `
                     <div class="msg-wrapper ${isUser ? 'user-msg-wrapper' : 'bot-msg-wrapper'}">
@@ -2041,7 +2041,7 @@
 
             const userMessage = {
                 sender: 'user',
-                name: 'Du',
+                name: selectedPersona && selectedPersona.name ? selectedPersona.name : 'Du',
                 text: userText
             };
             ensureMessageId(userMessage, chatHistory.length);
