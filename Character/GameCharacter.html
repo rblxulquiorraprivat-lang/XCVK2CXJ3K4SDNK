@@ -1064,7 +1064,12 @@
         const FAVORITE_MESSAGES_KEY_PREFIX = 'storyAI_favorite_messages_';
         const GROUP_DISPLAY_VERSION_KEY_PREFIX = 'storyAI_versions_';
         const DRAFT_KEY_PREFIX = 'storyAI_draft_';
-        
+
+        // Orama (dynamic) memory DB handles - will be initialized at runtime
+        let oramaDB = null;
+        let oramaInsert = null;
+        let oramaSearch = null;
+
         let currentCharacter = null;
         let chatHistory = [];
         let personas = [];
@@ -1125,6 +1130,50 @@
                 localStorage.setItem(key, JSON.stringify(window.groupDisplayVersion || {}));
             } catch (err) {
                 console.warn('Error saving group display versions:', err);
+            }
+        }
+
+        // Dynamically import and initialize Orama DB, then load existing chat history into it.
+        async function initOrama() {
+            try {
+                const orama = await import('https://cdn.jsdelivr.net/npm/@orama/orama@latest/+esm');
+
+                oramaInsert = typeof orama.insert === 'function' ? orama.insert : null;
+                oramaSearch = typeof orama.search === 'function' ? orama.search : null;
+
+                if (!orama || typeof orama.create !== 'function' || !oramaInsert || !oramaSearch) {
+                    throw new Error('Orama exports are incomplete.');
+                }
+
+                oramaDB = await orama.create({ schema: { role: 'string', content: 'string' } });
+
+                const existingMessages = Array.isArray(chatHistory) ? chatHistory : [];
+                const fallbackHistory = existingMessages.length
+                    ? existingMessages
+                    : (() => {
+                        try {
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const urlCharId = parseInt(urlParams.get('id'));
+                            const charId = currentCharacter?.id ?? urlCharId;
+                            const saved = localStorage.getItem(CHAT_HISTORY_PREFIX + charId);
+                            return saved ? JSON.parse(saved) : [];
+                        } catch (err) {
+                            return [];
+                        }
+                    })();
+
+                for (const msg of Array.isArray(fallbackHistory) ? fallbackHistory : []) {
+                    if (!msg) continue;
+                    const role = msg.role || (msg.sender === 'bot' || msg.sender === 'assistant' ? 'assistant' : 'user');
+                    const content = msg.content || msg.text;
+                    if (!content) continue;
+                    await oramaInsert(oramaDB, { role, content: String(content) });
+                }
+            } catch (err) {
+                console.warn('Could not initialize Orama:', err);
+                oramaDB = null;
+                oramaInsert = async () => [];
+                oramaSearch = async () => [];
             }
         }
 
@@ -1211,7 +1260,8 @@
             }
         }
 
-        function initChatPage() {
+        async function initChatPage() {
+            await initOrama();
             settings = { ...settings, ...loadStoredSettings() };
             const urlParams = new URLSearchParams(window.location.search);
             const charId = parseInt(urlParams.get('id')); 
@@ -1814,8 +1864,12 @@
                 });
                 saveMemories();
 
-                const prompt = buildAIPromptForReroll(lastBot);
+                let prompt = buildAIPromptForReroll(lastBot);
+                prompt = await injectOramaContext(prompt);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
+                try {
+                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: responseText.trim() });
+                } catch (e) { /* ignore */ }
                 const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
 
                 if (pendingIndex !== -1) {
@@ -2026,6 +2080,31 @@
             return buildCharacterPrompt(chatHistory, { mode: 'reply' });
         }
 
+        async function injectOramaContext(basePrompt) {
+            if (typeof oramaSearch !== 'function' || !oramaDB) return basePrompt;
+
+            const userMessages = chatHistory.filter(m => m && m.sender === 'user');
+            if (userMessages.length === 0) return basePrompt;
+
+            const lastUserText = userMessages[userMessages.length - 1].text;
+
+            try {
+                const searchResults = await oramaSearch(oramaDB, { term: lastUserText, limit: 3, tolerance: 1 });
+                const hits = Array.isArray(searchResults?.hits) ? searchResults.hits : [];
+
+                if (hits.length > 0) {
+                    let memoryContext = '\n[Wichtige Erinnerungen an frühere Ereignisse im Chat]:\n';
+                    const memoryEntries = hits.map(hit => hit?.document?.content || hit?.content || '').filter(Boolean).slice(0, 3);
+                    if (memoryEntries.length) {
+                        memoryContext += memoryEntries.map(entry => `- ${entry}`).join('\n');
+                        return `${memoryContext}\n\n${basePrompt}`;
+                    }
+                }
+            } catch (e) { /* ignore search errors */ }
+
+            return basePrompt;
+        }
+
         async function continueConversation() {
             if (isWaitingForAI) return;
 
@@ -2033,8 +2112,12 @@
             setLoadingState(true);
 
             try {
-                const prompt = buildAIPrompt();
+                let prompt = buildAIPrompt();
+                prompt = await injectOramaContext(prompt);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
+                try {
+                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: responseText.trim() });
+                } catch (e) { /* ignore */ }
                 finalizePendingBotMessage(pendingMsg, responseText.trim());
             } catch (error) {
                 console.error('AI Error:', error);
@@ -2114,13 +2197,13 @@
             if (isWaitingForAI) return;
             
             const inputEl = document.getElementById('chatInput');
-            const userText = inputEl.value.trim();
-            if (!userText) return;
+            const text = inputEl.value.trim();
+            if (!text) return;
 
             const userMessage = {
                 sender: 'user',
                 name: selectedPersona && selectedPersona.name ? selectedPersona.name : 'Du',
-                text: userText
+                text: text
             };
             ensureMessageId(userMessage, chatHistory.length);
             chatHistory.push(userMessage);
@@ -2136,9 +2219,38 @@
             setLoadingState(true);
 
             try {
-                const prompt = buildAIPrompt();
-                const responseText = await perchanceBridge.generateText(prompt, ['User:', '\nUser:']);
-                finalizePendingBotMessage(pendingMsg, responseText.trim());
+                if (typeof oramaInsert === 'function' && oramaDB) {
+                    try { await oramaInsert(oramaDB, { role: 'user', content: text }); } catch (e) { /* ignore */ }
+                }
+
+                let instruction = buildAIPrompt();
+                if (typeof oramaSearch === 'function' && oramaDB) {
+                    try {
+                        const searchResults = await oramaSearch(oramaDB, { term: text, limit: 3, tolerance: 1 });
+                        const hits = Array.isArray(searchResults?.hits) ? searchResults.hits : [];
+                        if (hits.length > 0) {
+                            let memoryContext = '\n[Wichtige Erinnerungen an frühere Ereignisse im Chat]:\n';
+                            const memoryEntries = hits
+                                .map(hit => hit?.document?.content || hit?.content || '')
+                                .filter(Boolean)
+                                .slice(0, 3);
+                            if (memoryEntries.length) {
+                                memoryContext += memoryEntries.map(entry => `- ${entry}`).join('\n');
+                                instruction = `${memoryContext}\n\n${instruction}`;
+                            }
+                        }
+                    } catch (e) {
+                        // search failed, continue without memories
+                    }
+                }
+
+                const aiResponse = await perchanceBridge.generateText(instruction, ['User:', '\nUser:']);
+
+                try {
+                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: aiResponse });
+                } catch (e) { /* ignore */ }
+
+                finalizePendingBotMessage(pendingMsg, aiResponse.trim());
             } catch (error) {
                 console.error("AI Error:", error);
                 finalizePendingBotMessage(pendingMsg, `*looks confused* I seem to be having trouble connecting to my thoughts right now. (Error: ${error.message})`);
@@ -2172,11 +2284,13 @@
             element.style.height = (element.scrollHeight) + "px";
         }
 
-        function clearSessionChat() {
+        async function clearSessionChat() {
             if (confirm("Do you want to reset all chat history with this character?")) {
                 localStorage.removeItem(CHAT_HISTORY_PREFIX + currentCharacter.id);
                 chatHistory = [];
                 renderChatLog();
+                // Reinitialize Orama so the memory DB is reset as well
+                try { await initOrama(); } catch (e) { /* ignore */ }
                 generateInitialGreeting();
             }
         }
