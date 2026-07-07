@@ -1922,7 +1922,7 @@
                         </div>
                     ` : '';
                 const displayName = isUser
-                    ? (selectedPersona && selectedPersona.name ? selectedPersona.name : 'Du')
+                    ? (msg.name || (selectedPersona && selectedPersona.name ? selectedPersona.name : 'You'))
                     : (msg.characterName || effectiveName || msg.name || currentCharacter.name);
                 
                 return `
