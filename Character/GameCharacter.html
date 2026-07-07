@@ -144,12 +144,13 @@
 
                     window.addEventListener('message', handleMessage);
 
+                    // Use wildcard targetOrigin for parent postMessage to avoid origin-mismatch
                     const sent = safePostBridgeMessage({
                         type: 'AI_REQUEST',
                         requestId: requestId,
                         instruction: instruction,
                         stopSequences: stopSequences
-                    });
+                    }, '*');
 
                     if (!sent) {
                         if (settled) return;
