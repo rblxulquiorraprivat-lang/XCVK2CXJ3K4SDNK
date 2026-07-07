@@ -53,12 +53,33 @@
             return targets;
         }
 
+        let bridgeParentOrigin = null;
+
+        function resolveBridgeTargetOrigin(preferredOrigin = null) {
+            if (preferredOrigin) return preferredOrigin;
+            if (bridgeParentOrigin) return bridgeParentOrigin;
+            try {
+                const referrer = document.referrer;
+                if (referrer) {
+                    const parsedReferrer = new URL(referrer);
+                    if (parsedReferrer.origin) return parsedReferrer.origin;
+                }
+            } catch (_) {}
+            try {
+                if (window.location.ancestorOrigins && window.location.ancestorOrigins.length) {
+                    return window.location.ancestorOrigins[0];
+                }
+            } catch (_) {}
+            return '*';
+        }
+
         function safePostBridgeMessage(payload, preferredOrigin = null) {
             const targets = getBridgeTargets();
             if (!targets.length) return false;
 
             const candidateOrigins = [];
-            if (preferredOrigin) candidateOrigins.push(preferredOrigin);
+            const resolvedOrigin = resolveBridgeTargetOrigin(preferredOrigin);
+            if (resolvedOrigin) candidateOrigins.push(resolvedOrigin);
             candidateOrigins.push('*');
 
             for (const target of targets) {
@@ -128,7 +149,7 @@
                         requestId: requestId,
                         instruction: instruction,
                         stopSequences: stopSequences
-                    }, window.location.origin);
+                    });
 
                     if (!sent) {
                         if (settled) return;
