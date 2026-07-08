@@ -764,6 +764,14 @@
                 </div>
 
                 <div class="form-group">
+                    <label class="form-label" for="charVoiceLanguage">Voice Language</label>
+                    <select id="charVoiceLanguage" class="form-control" onchange="onVoiceLanguageChange()">
+                        <option value="">🌐 All languages</option>
+                    </select>
+                    <p class="voice-hint" style="margin-top:6px;">Filter the voice list below by language — your browser may offer voices for many languages, not only German.</p>
+                </div>
+
+                <div class="form-group">
                     <label class="form-label" for="charVoiceSelect">Character Voice</label>
                     <select id="charVoiceSelect" class="form-control" onchange="updatePreview()">
                         <option value="">Standardstimme des Browsers</option>
@@ -893,6 +901,69 @@
         // --- Voice / Text-to-Speech (Web Speech API) ---
         let availableVoices = [];
         let pendingVoiceName = '';
+        let pendingVoiceLang = '';
+
+        // Bekannte Sprachnamen für gängige Locale-Codes, damit die Sprachauswahl
+        // lesbar ist (z.B. "Englisch (US)" statt nur "en-US"). Unbekannte Codes
+        // werden einfach mit ihrem Rohwert angezeigt, damit KEINE Sprache verloren
+        // geht oder ausgeblendet wird - vorher tauchte praktisch nur Deutsch als
+        // "erste" bzw. einzig offensichtliche Option auf.
+        const LANGUAGE_DISPLAY_NAMES = {
+            'de': 'Deutsch', 'de-DE': 'Deutsch (DE)', 'de-AT': 'Deutsch (AT)', 'de-CH': 'Deutsch (CH)',
+            'en': 'English', 'en-US': 'English (US)', 'en-GB': 'English (UK)', 'en-AU': 'English (AU)', 'en-CA': 'English (CA)', 'en-IN': 'English (IN)',
+            'es': 'Español', 'es-ES': 'Español (ES)', 'es-MX': 'Español (MX)', 'es-US': 'Español (US)',
+            'fr': 'Français', 'fr-FR': 'Français (FR)', 'fr-CA': 'Français (CA)',
+            'it': 'Italiano', 'it-IT': 'Italiano (IT)',
+            'pt': 'Português', 'pt-PT': 'Português (PT)', 'pt-BR': 'Português (BR)',
+            'nl': 'Nederlands', 'nl-NL': 'Nederlands (NL)',
+            'pl': 'Polski', 'pl-PL': 'Polski (PL)',
+            'ru': 'Русский', 'ru-RU': 'Русский (RU)',
+            'tr': 'Türkçe', 'tr-TR': 'Türkçe (TR)',
+            'ja': '日本語', 'ja-JP': '日本語 (JP)',
+            'ko': '한국어', 'ko-KR': '한국어 (KR)',
+            'zh': '中文', 'zh-CN': '中文 (CN)', 'zh-TW': '中文 (TW)', 'zh-HK': '中文 (HK)',
+            'ar': 'العربية', 'ar-SA': 'العربية (SA)',
+            'hi': 'हिन्दी', 'hi-IN': 'हिन्दी (IN)',
+            'sv': 'Svenska', 'sv-SE': 'Svenska (SE)',
+            'da': 'Dansk', 'da-DK': 'Dansk (DK)',
+            'no': 'Norsk', 'nb-NO': 'Norsk (NO)',
+            'fi': 'Suomi', 'fi-FI': 'Suomi (FI)',
+            'cs': 'Čeština', 'cs-CZ': 'Čeština (CZ)',
+            'el': 'Ελληνικά', 'el-GR': 'Ελληνικά (GR)',
+            'uk': 'Українська', 'uk-UA': 'Українська (UA)'
+        };
+
+        function getLanguageDisplayName(langCode) {
+            if (!langCode) return 'Unknown';
+            if (LANGUAGE_DISPLAY_NAMES[langCode]) return LANGUAGE_DISPLAY_NAMES[langCode];
+            const base = langCode.split('-')[0];
+            if (LANGUAGE_DISPLAY_NAMES[base]) return `${LANGUAGE_DISPLAY_NAMES[base]} (${langCode})`;
+            return langCode;
+        }
+
+        function populateVoiceLanguageOptions() {
+            const langSelect = document.getElementById('charVoiceLanguage');
+            if (!langSelect) return;
+
+            const uniqueLangs = [...new Set(availableVoices.map(v => v.lang))].sort((a, b) => {
+                return getLanguageDisplayName(a).localeCompare(getLanguageDisplayName(b));
+            });
+
+            const optionsHtml = uniqueLangs.map(lang => {
+                const count = availableVoices.filter(v => v.lang === lang).length;
+                return `<option value="${lang}">${getLanguageDisplayName(lang)} — ${count} ${count === 1 ? 'voice' : 'voices'}</option>`;
+            }).join('');
+
+            langSelect.innerHTML = '<option value="">🌐 All languages</option>' + optionsHtml;
+
+            if (pendingVoiceLang && uniqueLangs.includes(pendingVoiceLang)) {
+                langSelect.value = pendingVoiceLang;
+            }
+        }
+
+        function onVoiceLanguageChange() {
+            populateVoiceSelectOptions();
+        }
 
         function populateVoiceSelectOptions() {
             const select = document.getElementById('charVoiceSelect');
@@ -905,7 +976,13 @@
                 return;
             }
 
-            const sorted = [...availableVoices].sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+            populateVoiceLanguageOptions();
+
+            const langSelect = document.getElementById('charVoiceLanguage');
+            const langFilter = langSelect ? langSelect.value : '';
+            const voicesInScope = langFilter ? availableVoices.filter(v => v.lang === langFilter) : availableVoices;
+
+            const sorted = [...voicesInScope].sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
             const optionsHtml = sorted.map(v => {
                 const safeName = v.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
                 return `<option value="${safeName}">${safeName} (${v.lang})</option>`;
@@ -1062,6 +1139,7 @@
 
             const voiceSettings = item.voiceSettings || {};
             pendingVoiceName = voiceSettings.voiceName || '';
+            pendingVoiceLang = voiceSettings.voiceLang || '';
             const pitchInput = document.getElementById('charVoicePitch');
             const rateInput = document.getElementById('charVoiceRate');
             const pitchValue = typeof voiceSettings.pitch === 'number' ? voiceSettings.pitch : 1;
@@ -1309,6 +1387,17 @@
             }
         }
 
+        // Monotonisch steigende ID-Vergabe - identisches Prinzip wie in index.html.
+        // Verhindert, dass eine neu erstellte Story/Character/World dieselbe ID wie
+        // ein zuvor gelöschtes Item bekommt (siehe ausführlichen Kommentar dort).
+        let __lastGeneratedItemId = 0;
+        function generateNewItemId(existingItems) {
+            const highestExisting = (existingItems || []).reduce((maxId, item) => Math.max(maxId, item.id || 0), 0);
+            const candidate = Math.max(Date.now(), highestExisting + 1, __lastGeneratedItemId + 1);
+            __lastGeneratedItemId = candidate;
+            return candidate;
+        }
+
         // Process submit payload
         async function handleFormSubmit(e) {
             e.preventDefault();
@@ -1338,7 +1427,7 @@
             };
 
             const fullCharacterEntity = {
-                id: editId || savedItems.reduce((maxId, item) => Math.max(maxId, item.id || 0), 6) + 1,
+                id: editId || generateNewItemId(savedItems),
                 type: 'character',
                 name: document.getElementById('charStoryName').value,
                 storyName: document.getElementById('charStoryName').value,
