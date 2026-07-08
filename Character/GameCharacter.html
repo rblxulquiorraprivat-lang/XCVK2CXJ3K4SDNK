@@ -1590,8 +1590,10 @@
                 // Disable remote model loading from the Hugging Face Hub entirely.
                 env.allowRemoteModels = false;
                 env.allowLocalModels = true;
-                // Specify the custom local path where model weights are hosted.
-                env.localModelPath = '/models/';
+                // Relativer Pfad (kein führendes "/"!), damit er sich relativ zur
+                // aktuellen Seite auflöst (z.B. /XCVK2CXJ3K4SDNK/models/...)
+                // statt zur Domain-Wurzel (das war die Ursache der 404-Fehler).
+                env.localModelPath = new URL('./models/', window.location.href).href;
 
                 // Allocate the pipeline only after the env is locked to local-only.
                 transformerPipeline = await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
