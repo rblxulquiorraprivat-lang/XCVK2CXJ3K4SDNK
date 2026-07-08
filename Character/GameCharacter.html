@@ -825,12 +825,150 @@
         }
 
         .msg-content {
+            position: relative;
             padding: 16px 20px;
             border-radius: 20px;
             font-size: 0.98rem;
             line-height: 1.6;
             color: #f1f5f9;
             word-wrap: break-word;
+        }
+
+        .msg-edit-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 30px;
+            height: 30px;
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.25);
+            color: rgba(255,255,255,0.8);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .msg-edit-btn:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+
+        .msg-edit-btn svg {
+            width: 16px;
+            height: 16px;
+            fill: currentColor;
+        }
+
+        .control-btn:disabled,
+        .persona-selector-btn:disabled {
+            opacity: 0.45;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .edit-msg-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(2, 6, 23, 0.78);
+            backdrop-filter: blur(10px);
+            z-index: 2100;
+        }
+
+        .edit-msg-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(820px, calc(100vw - 24px));
+            max-height: min(82vh, 820px);
+            background: rgba(10, 10, 16, 0.98);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+            z-index: 2101;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .edit-msg-modal__header {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .edit-msg-modal__title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            margin-bottom: 4px;
+        }
+
+        .edit-msg-modal__subtitle {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .edit-msg-modal__body {
+            padding: 18px 22px 22px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            overflow: auto;
+        }
+
+        .edit-msg-textarea {
+            width: 100%;
+            min-height: 220px;
+            resize: vertical;
+            border-radius: 18px;
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            padding: 14px 14px;
+            outline: none;
+            font-size: 0.98rem;
+            line-height: 1.55;
+        }
+
+        .edit-msg-textarea:focus {
+            border-color: rgba(99,102,241,0.55);
+            box-shadow: 0 0 0 3px rgba(99,102,241,0.16);
+        }
+
+        .edit-msg-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
+
+        .edit-msg-btn {
+            border: 1px solid rgba(255,255,255,0.10);
+            background: rgba(255,255,255,0.04);
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 14px;
+            cursor: pointer;
+            font-weight: 700;
+            transition: var(--transition);
+        }
+
+        .edit-msg-btn:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .edit-msg-btn-primary {
+            background: rgba(99,102,241,0.9);
+            border-color: rgba(99,102,241,0.9);
+        }
+
+        .edit-msg-btn-primary:hover {
+            filter: brightness(1.08);
         }
 
         .bot-msg-wrapper .msg-content {
@@ -1286,7 +1424,11 @@
                             <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96c-.5-.38-1.04-.7-1.64-.94L14.4 2.5a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.6.24-1.14.56-1.64.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 10.74a.5.5 0 0 0 .12.64l2.03 1.58c-.04.3-.06.61-.06.94s.02.64.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.38 1.04.7 1.64.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .49-.42l.36-2.54c.6-.24 1.14-.56 1.64-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
                         </svg>
                     </button>
-                    <a href="../index.html" class="control-btn">Back to Hub</a>
+                    <button type="button" class="control-btn icon-btn" id="backHubBtn" onclick="handleBackToHub()" title="Back to Hub">
+                        <svg viewBox="0 0 24 24">
+                            <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+                        </svg>
+                    </button>
                 </div>
             </section>
 
@@ -1318,6 +1460,26 @@
                         </div>
                         <div class="npc-info-list" id="npcFavoriteMessagesList"></div>
                     </section>
+                </div>
+            </div>
+
+            <div class="edit-msg-backdrop" id="editMsgBackdrop" style="display: none;" onclick="closeEditMessageModal()"></div>
+            <div class="edit-msg-modal" id="editMsgModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="editMsgTitle">
+                <div class="edit-msg-modal__header">
+                    <div>
+                        <div class="edit-msg-modal__title" id="editMsgTitle">AI Nachricht bearbeiten</div>
+                        <div class="edit-msg-modal__subtitle">Währenddessen sind Senden/Löschen/Reroll/Continue/Zurück gesperrt.</div>
+                    </div>
+                    <button type="button" class="modal-close-btn" onclick="closeEditMessageModal()" title="Schließen">
+                        <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
+                    </button>
+                </div>
+                <div class="edit-msg-modal__body">
+                    <textarea id="editMsgTextarea" class="edit-msg-textarea" placeholder="AI Nachricht..."></textarea>
+                    <div class="edit-msg-actions">
+                        <button type="button" class="edit-msg-btn" onclick="closeEditMessageModal()">Abbrechen</button>
+                        <button type="button" class="edit-msg-btn edit-msg-btn-primary" id="editMsgSaveBtn" onclick="saveEditMessageModal()">Speichern</button>
+                    </div>
                 </div>
             </div>
 
@@ -1574,6 +1736,16 @@
             try { modelStatusChannel?.postMessage({ status }); } catch (err) { /* ignore */ }
         }
 
+        const MEMORY_SYSTEM_SYNC_KEY = 'storyai_memory_system';
+        let settingsSyncChannel = null;
+        try {
+            settingsSyncChannel = new BroadcastChannel('storyai-settings');
+        } catch (err) {
+            console.warn('Settings BroadcastChannel not available, falling back to localStorage only:', err);
+        }
+        let isPageUnloading = false;
+        window.addEventListener('pagehide', () => { isPageUnloading = true; });
+
         let currentCharacter = null;
         let activeSpeechMessageId = null;
         let chatHistory = [];
@@ -1585,8 +1757,39 @@
         let isPersonaMenuOpen = false;
         let isWaitingForAI = false;
         let isNpcInfoModalOpen = false;
+        let isEditingAiMessage = false;
+        let editingMessageId = null;
         let npcMemoriesSearchQuery = '';
         let npcFavoritesSearchQuery = '';
+
+        const isMobileChatInput = (() => {
+            try {
+                const ua = navigator.userAgent || '';
+                if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobi/i.test(ua)) return true;
+                if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
+            } catch (_) {}
+            return false;
+        })();
+
+        function applyInteractionLocks() {
+            const sendBtn = document.getElementById('sendBtn');
+            const chatInput = document.getElementById('chatInput');
+            const backHubBtn = document.getElementById('backHubBtn');
+            const npcInfoBtn = document.getElementById('npcInfoBtn');
+            const personaBtn = document.getElementById('personaSelectBtn');
+
+            const interactionLocked = isWaitingForAI || isEditingAiMessage;
+
+            if (sendBtn) sendBtn.disabled = interactionLocked;
+            if (chatInput) chatInput.disabled = interactionLocked;
+            if (backHubBtn) backHubBtn.disabled = isEditingAiMessage;
+            if (npcInfoBtn) npcInfoBtn.disabled = isEditingAiMessage;
+            if (personaBtn) personaBtn.disabled = isEditingAiMessage;
+
+            if (interactionLocked) {
+                closePersonaMenu();
+            }
+        }
 
         function generateMessageId(index = 0) {
             return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${index}`;
@@ -1694,7 +1897,12 @@
         // model weights must be present locally in the game folder - the Hugging Face
         // Hub is never contacted, even as a fallback.
         async function initTransformerJS() {
-            reportModelStatus('loading');
+            const previousModelStatus = (() => {
+                try { return localStorage.getItem(MODEL_STATUS_KEY); } catch (_) { return null; }
+            })();
+            if (previousModelStatus !== 'loaded') {
+                reportModelStatus('loading');
+            }
             try {
                 // Import the local build of the library from your project folder
                 // (e.g. ./libs/transformers.min.js). Do NOT point this at a CDN.
@@ -1767,7 +1975,14 @@
                 oramaDB = null;
                 oramaInsert = async () => [];
                 oramaSearch = async () => ({ hits: [] });
-                reportModelStatus('not-loaded');
+                const errorName = (() => {
+                    try { return err && typeof err === 'object' ? err.name : null; } catch (_) { return null; }
+                })();
+                const isAbort = errorName === 'AbortError';
+                const isHidden = document.hidden || document.visibilityState === 'hidden';
+                if (!isAbort && !isHidden && !isPageUnloading) {
+                    reportModelStatus('not-loaded');
+                }
             }
         }
 
@@ -1776,10 +1991,21 @@
         async function initMemorySystem() {
             const preference = settings.memorySystem;
             if (preference === 'Transformer.js') {
+                const status = (() => {
+                    try { return localStorage.getItem(MODEL_STATUS_KEY); } catch (_) { return null; }
+                })();
+                if (status !== 'loaded') {
+                    settings.memorySystem = 'Orama';
+                    try { await db.table('settings').put({ id: 1, value: settings }); } catch (err) { console.warn('Error saving settings:', err); }
+                    try { localStorage.setItem(MEMORY_SYSTEM_SYNC_KEY, 'Orama'); } catch (_) {}
+                    try { settingsSyncChannel?.postMessage({ type: 'memorySystem', value: 'Orama' }); } catch (_) {}
+                    await initOrama();
+                    return;
+                }
                 await initTransformerJS();
-            } else {
-                await initOrama();
+                return;
             }
+            await initOrama();
         }
 
         function getDraftKey(characterId = null) {
@@ -2254,6 +2480,7 @@
         }
 
         function toggleNpcInfoModal() {
+            if (isEditingAiMessage) return;
             isNpcInfoModalOpen = !isNpcInfoModalOpen;
             const backdrop = document.getElementById('npcInfoBackdrop');
             const modal = document.getElementById('npcInfoModal');
@@ -2538,6 +2765,7 @@
 
         async function deleteMessagePair(msgIndex) {
             if (isWaitingForAI) return;
+            if (isEditingAiMessage) return;
 
             const targetMsg = chatHistory[msgIndex];
             if (!targetMsg) return;
@@ -2721,6 +2949,7 @@
 
         async function rerollLatestBotMessage() {
             if (isWaitingForAI) return;
+            if (isEditingAiMessage) return;
             const lastBot = getLastVisibleBotMessage();
             if (!lastBot) return;
             stopSpeaking();
@@ -2854,6 +3083,7 @@
 
         function togglePersonaMenu(event) {
             if (event) event.stopPropagation();
+            if (isEditingAiMessage) return;
             isPersonaMenuOpen = !isPersonaMenuOpen;
             renderPersonaMenu();
         }
@@ -2861,6 +3091,83 @@
         function closePersonaMenu() {
             isPersonaMenuOpen = false;
             renderPersonaMenu();
+        }
+
+        function handleBackToHub() {
+            if (isEditingAiMessage) return;
+            window.location.href = '../index.html';
+        }
+
+        function getLastVisibleBotMessage() {
+            normalizeChatHistoryIds();
+            const visibleMessages = chatHistory.filter(msg => isMessageVisible(msg));
+            for (let i = visibleMessages.length - 1; i >= 0; i--) {
+                if (visibleMessages[i] && visibleMessages[i].sender === 'bot') return visibleMessages[i];
+            }
+            return null;
+        }
+
+        function openEditMessageModal(messageId) {
+            if (isWaitingForAI) return;
+            if (!messageId) return;
+            const lastBot = getLastVisibleBotMessage();
+            if (!lastBot || lastBot.id !== messageId) return;
+            if (lastBot.isLoading) return;
+
+            isEditingAiMessage = true;
+            editingMessageId = messageId;
+
+            const textarea = document.getElementById('editMsgTextarea');
+            const backdrop = document.getElementById('editMsgBackdrop');
+            const modal = document.getElementById('editMsgModal');
+            if (!textarea || !backdrop || !modal) return;
+
+            textarea.value = typeof lastBot.text === 'string' ? lastBot.text : '';
+            backdrop.style.display = 'block';
+            modal.style.display = 'flex';
+
+            applyInteractionLocks();
+            renderChatLog();
+            setTimeout(() => {
+                try { textarea.focus(); } catch (_) {}
+            }, 0);
+        }
+
+        function closeEditMessageModal() {
+            const backdrop = document.getElementById('editMsgBackdrop');
+            const modal = document.getElementById('editMsgModal');
+            if (backdrop) backdrop.style.display = 'none';
+            if (modal) modal.style.display = 'none';
+            isEditingAiMessage = false;
+            editingMessageId = null;
+            applyInteractionLocks();
+            renderChatLog();
+            const chatInput = document.getElementById('chatInput');
+            if (chatInput && !chatInput.disabled) {
+                try { chatInput.focus(); } catch (_) {}
+            }
+        }
+
+        async function saveEditMessageModal() {
+            const messageId = editingMessageId;
+            if (!messageId) return;
+
+            const textarea = document.getElementById('editMsgTextarea');
+            if (!textarea) return;
+
+            const nextText = String(textarea.value || '').replace(/\r\n/g, '\n').trim();
+            if (!nextText) return;
+
+            const lastBot = getLastVisibleBotMessage();
+            if (!lastBot || lastBot.id !== messageId) return;
+
+            const idx = chatHistory.findIndex(m => m && m.id === messageId);
+            if (idx === -1) return;
+
+            chatHistory[idx] = { ...chatHistory[idx], text: nextText };
+            await saveChatHistory();
+            await syncMemoriesFromChatHistory();
+            closeEditMessageModal();
         }
 
         function updatePersonaSearch(event) {
@@ -2914,6 +3221,7 @@
         function renderChatLog() {
             const logArea = document.getElementById('storyLog');
             
+            normalizeChatHistoryIds();
             const visibleMessages = chatHistory.filter(msg => isMessageVisible(msg));
             const effectiveName = getCharacterName();
             const lastVisibleBotMessage = (() => {
@@ -2929,34 +3237,40 @@
                 const isUser = (msg.sender === 'user');
                 const formattedText = formatJanitorText(msg.text);
                 const isLastBot = !isUser && msg === lastVisibleBotMessage;
+                const groupId = msg.rerollGroupId;
+                const introGroup = groupId && String(groupId).endsWith('_intro');
+                const groupVersions = groupId ? chatHistory.filter(m => m.rerollGroupId === groupId).sort((a, b) => a.versionNumber - b.versionNumber) : [];
+                const allowEdits = !isEditingAiMessage && isLastBot && !introGroup && !msg.isLoading;
+                const editBtnHtml = allowEdits ? `
+                    <button type="button" class="msg-edit-btn" title="AI Nachricht bearbeiten" onclick="openEditMessageModal('${msg.id || ''}')">
+                        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                    </button>
+                ` : '';
                 const contentHtml = msg.isLoading ? `
                     <div class="msg-content msg-content-loading">
                         <div class="msg-loading-dots" aria-label="Loading response">
                             <span></span><span></span><span></span>
                         </div>
                     </div>
-                ` : `<div class="msg-content">${formattedText}</div>`;
-                const groupId = msg.rerollGroupId;
-                const groupVersions = groupId ? chatHistory.filter(m => m.rerollGroupId === groupId).sort((a, b) => a.versionNumber - b.versionNumber) : [];
-                const introGroup = groupId && String(groupId).endsWith('_intro');
+                ` : `<div class="msg-content">${editBtnHtml}${formattedText}</div>`;
                 
                 // Index im originalen chatHistory-Array finden, um das korrekte Löschen zu triggern
                 const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
 
                 // Delete-Buttons nur anzeigen, wenn gerade keine KI-Antwort generiert wird.
-                const showDeleteBtn = !isWaitingForAI && (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
+                const showDeleteBtn = !isWaitingForAI && !isEditingAiMessage && (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
                 const deleteBtnHtml = showDeleteBtn ? `
                     <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                     </button>
                 ` : '';
-                const favoriteBtnHtml = !isUser ? `
+                const favoriteBtnHtml = (!isUser && !isEditingAiMessage) ? `
                     <button type="button" class="msg-favorite-btn ${favoriteMessages.includes(msg.id) ? 'is-favorite' : ''}" title="Nachricht favorisieren" onclick="toggleFavoriteMessage('${msg.id || ''}')">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                     </button>
                 ` : '';
                 const isSpeakingThis = !isUser && activeSpeechMessageId === msg.id;
-                const speakBtnHtml = (!isUser && !msg.isLoading) ? `
+                const speakBtnHtml = (!isUser && !msg.isLoading && !isEditingAiMessage) ? `
                     <button type="button" class="msg-speak-btn ${isSpeakingThis ? 'is-speaking' : ''}" title="${isSpeakingThis ? 'Vorlesen stoppen' : 'Nachricht vorlesen'}" onclick="toggleSpeakMessage('${msg.id || ''}')">
                         ${isSpeakingThis ? `
                         <svg viewBox="0 0 24 24" style="width:15px; height:15px; fill:currentColor;"><path d="M6 6h12v12H6z"/></svg>
@@ -2966,8 +3280,8 @@
                     </button>
                 ` : '';
 
-                const showRerollControls = isLastBot && !isUser && !introGroup && !msg.isLoading;
-                const showVersionControls = isLastBot && !isUser && !msg.isLoading && groupVersions.length > 1;
+                const showRerollControls = !isEditingAiMessage && isLastBot && !isUser && !introGroup && !msg.isLoading;
+                const showVersionControls = !isEditingAiMessage && isLastBot && !isUser && !msg.isLoading && groupVersions.length > 1;
                 
                 const versionControls = showVersionControls ? `
                         <div class="msg-variant-controls">
@@ -3056,6 +3370,7 @@
 
         async function continueConversation() {
             if (isWaitingForAI) return;
+            if (isEditingAiMessage) return;
 
             const pendingMsg = addPendingBotMessage();
             setLoadingState(true);
@@ -3156,6 +3471,7 @@
 
         async function handleUserSend() {
             if (isWaitingForAI) return;
+            if (isEditingAiMessage) return;
             
             const inputEl = document.getElementById('chatInput');
             const text = inputEl.value.trim();
@@ -3233,19 +3549,12 @@
         function setLoadingState(isLoading) {
             isWaitingForAI = isLoading;
             const logArea = document.getElementById('storyLog');
-            const sendBtn = document.getElementById('sendBtn');
+            if (isLoading && logArea) logArea.scrollTop = logArea.scrollHeight;
+            applyInteractionLocks();
             const chatInput = document.getElementById('chatInput');
-            
-            if (isLoading) {
-                logArea.scrollTop = logArea.scrollHeight;
-                sendBtn.disabled = true;
-                chatInput.disabled = true;
-            } else {
-                sendBtn.disabled = false;
-                chatInput.disabled = false;
-                chatInput.focus();
+            if (!isWaitingForAI && !isEditingAiMessage && chatInput && !chatInput.disabled) {
+                try { chatInput.focus(); } catch (_) {}
             }
-
             renderChatLog();
         }
 
@@ -3271,13 +3580,26 @@
         }
 
         document.getElementById('chatInput').addEventListener('keydown', function(e) {
+            if (isEditingAiMessage) return;
+            if (isMobileChatInput) return;
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 handleUserSend();
             }
         });
 
-        window.onload = initChatPage;
+        window.addEventListener('beforeunload', (event) => {
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            if (isEditingAiMessage) {
+                event.preventDefault();
+                event.returnValue = '';
+            }
+        });
+
+        window.onload = () => {
+            initChatPage();
+            applyInteractionLocks();
+        };
     </script>
 </body>
 </html>
