@@ -202,6 +202,29 @@
             line-height: 1.5;
         }
 
+        input[type="range"].form-control {
+            padding: 10px 0;
+            background: transparent;
+            border: none;
+            accent-color: var(--color-primary);
+            cursor: pointer;
+        }
+
+        .voice-test-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .voice-test-row .btn-add-dynamic {
+            white-space: nowrap;
+        }
+
+        .voice-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
         /* Dynamic Lists Layout (Tags & Secrets) */
         .dynamic-list-container {
             background: rgba(0, 0, 0, 0.25);
@@ -735,6 +758,34 @@
                     </div>
                 </div>
 
+                <div class="section-subtitle">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                    5. Voice & Sound (Text-to-Speech)
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label" for="charVoiceSelect">Character Voice</label>
+                    <select id="charVoiceSelect" class="form-control" onchange="updatePreview()">
+                        <option value="">Standardstimme des Browsers</option>
+                    </select>
+                    <p class="voice-hint" style="margin-top:6px;">Nutzt die im Browser eingebaute Sprachausgabe (Web Speech API) — kein Download nötig. Verfügbare Stimmen hängen vom Gerät/Browser des Spielers ab.</p>
+                </div>
+
+                <div class="form-group row-2">
+                    <div>
+                        <label class="form-label" for="charVoicePitch">Tonhöhe (<span id="pitchValue">1.0</span>)</label>
+                        <input type="range" id="charVoicePitch" class="form-control" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('pitchValue').innerText = parseFloat(this.value).toFixed(1)">
+                    </div>
+                    <div>
+                        <label class="form-label" for="charVoiceRate">Sprechgeschwindigkeit (<span id="rateValue">1.0</span>)</label>
+                        <input type="range" id="charVoiceRate" class="form-control" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('rateValue').innerText = parseFloat(this.value).toFixed(1)">
+                    </div>
+                </div>
+
+                <div class="form-group voice-test-row">
+                    <button type="button" class="btn-add-dynamic" onclick="testCharacterVoice()">🔊 Stimme testen</button>
+                </div>
+
                 <button type="submit" class="create-submit-btn">
                     <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                     <span class="submit-text">Initialize Character Entity Locally</span>
@@ -772,6 +823,7 @@
                     <div class="preview-details-grid">
                         <div class="preview-detail-item"><strong>Status:</strong> <span id="previewStatusText">Lokal angelegt</span></div>
                         <div class="preview-detail-item"><strong>Introductions:</strong> <span id="previewIntroductionsCount">0</span></div>
+                        <div class="preview-detail-item"><strong>🔊 Voice:</strong> <span id="previewVoiceLabel">Standardstimme</span></div>
                     </div>
 
                     <div class="live-tags" id="previewTags"></div>
@@ -828,8 +880,77 @@
             const card = document.getElementById('previewCard');
             card.style.borderColor = `${color}44`;
 
+            const voiceSelect = document.getElementById('charVoiceSelect');
+            const voiceLabel = document.getElementById('previewVoiceLabel');
+            if (voiceLabel) {
+                voiceLabel.innerText = (voiceSelect && voiceSelect.value) ? voiceSelect.value : 'Standardstimme';
+            }
+
             renderTagsPreview();
             renderIntroductionPreview();
+        }
+
+        // --- Voice / Text-to-Speech (Web Speech API) ---
+        let availableVoices = [];
+        let pendingVoiceName = '';
+
+        function populateVoiceSelectOptions() {
+            const select = document.getElementById('charVoiceSelect');
+            if (!select) return;
+
+            availableVoices = ('speechSynthesis' in window) ? window.speechSynthesis.getVoices() : [];
+
+            if (!availableVoices.length) {
+                select.innerHTML = '<option value="">Standardstimme des Browsers</option>';
+                return;
+            }
+
+            const sorted = [...availableVoices].sort((a, b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+            const optionsHtml = sorted.map(v => {
+                const safeName = v.name.replace(/&/g, '&amp;').replace(/"/g, '&quot;');
+                return `<option value="${safeName}">${safeName} (${v.lang})</option>`;
+            }).join('');
+            select.innerHTML = '<option value="">Standardstimme des Browsers</option>' + optionsHtml;
+
+            if (pendingVoiceName && sorted.some(v => v.name === pendingVoiceName)) {
+                select.value = pendingVoiceName;
+            }
+            updatePreview();
+        }
+
+        function initVoiceSupport() {
+            const select = document.getElementById('charVoiceSelect');
+            if (!('speechSynthesis' in window)) {
+                if (select) select.innerHTML = '<option value="">Text-to-Speech wird von diesem Browser nicht unterstützt</option>';
+                return;
+            }
+            populateVoiceSelectOptions();
+            window.speechSynthesis.addEventListener('voiceschanged', populateVoiceSelectOptions);
+        }
+
+        function testCharacterVoice() {
+            if (!('speechSynthesis' in window)) {
+                alert('Dein Browser unterstützt leider keine Sprachausgabe (Web Speech API). Probier es z.B. mit Chrome, Edge oder Safari.');
+                return;
+            }
+            const name = document.getElementById('charStoryName').value.trim() || 'dein Charakter';
+            const select = document.getElementById('charVoiceSelect');
+            const pitch = parseFloat(document.getElementById('charVoicePitch').value) || 1;
+            const rate = parseFloat(document.getElementById('charVoiceRate').value) || 1;
+
+            window.speechSynthesis.cancel();
+            const utterance = new SpeechSynthesisUtterance(`Hallo, ich bin ${name}. So klinge ich!`);
+            utterance.pitch = pitch;
+            utterance.rate = rate;
+
+            if (select && select.value) {
+                const voice = availableVoices.find(v => v.name === select.value);
+                if (voice) {
+                    utterance.voice = voice;
+                    utterance.lang = voice.lang;
+                }
+            }
+            window.speechSynthesis.speak(utterance);
         }
 
         // Secrets Management
@@ -938,6 +1059,19 @@
             renderTags();
             renderSecrets();
             renderIntroductions();
+
+            const voiceSettings = item.voiceSettings || {};
+            pendingVoiceName = voiceSettings.voiceName || '';
+            const pitchInput = document.getElementById('charVoicePitch');
+            const rateInput = document.getElementById('charVoiceRate');
+            const pitchValue = typeof voiceSettings.pitch === 'number' ? voiceSettings.pitch : 1;
+            const rateValue = typeof voiceSettings.rate === 'number' ? voiceSettings.rate : 1;
+            pitchInput.value = pitchValue;
+            rateInput.value = rateValue;
+            document.getElementById('pitchValue').innerText = pitchValue.toFixed(1);
+            document.getElementById('rateValue').innerText = rateValue.toFixed(1);
+            populateVoiceSelectOptions();
+
             updatePreview();
             document.querySelector('.create-submit-btn').innerText = 'Save character';
         }
@@ -1192,6 +1326,17 @@
                 return;
             }
 
+            const voiceSelectEl = document.getElementById('charVoiceSelect');
+            const selectedVoiceObj = (voiceSelectEl && voiceSelectEl.value)
+                ? availableVoices.find(v => v.name === voiceSelectEl.value)
+                : null;
+            const voiceSettings = {
+                voiceName: selectedVoiceObj ? selectedVoiceObj.name : '',
+                voiceLang: selectedVoiceObj ? selectedVoiceObj.lang : '',
+                pitch: parseFloat(document.getElementById('charVoicePitch').value) || 1,
+                rate: parseFloat(document.getElementById('charVoiceRate').value) || 1
+            };
+
             const fullCharacterEntity = {
                 id: editId || savedItems.reduce((maxId, item) => Math.max(maxId, item.id || 0), 6) + 1,
                 type: 'character',
@@ -1211,6 +1356,7 @@
                 introductions: currentIntroductions,
                 secrets: currentSecrets,
                 tags: currentTags,
+                voiceSettings,
                 lastPlayed: Date.now(),
                 engine: 'StoryAI Creator',
                 favorite: false,
@@ -1270,6 +1416,7 @@
 
         // Initial start when loading
         window.addEventListener('DOMContentLoaded', async () => {
+            initVoiceSupport();
             // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
             await migrateLegacyLocalStorage();
             await initializeForm();

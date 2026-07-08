@@ -625,7 +625,14 @@
         .msg-header-row {
             display: flex;
             align-items: center;
+            justify-content: space-between;
             gap: 8px;
+        }
+
+        .msg-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
         }
 
         .msg-sender-name {
@@ -680,6 +687,36 @@
         .msg-favorite-btn.is-favorite {
             color: #fbbf24;
             opacity: 1;
+        }
+
+        .msg-speak-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            opacity: 0.7;
+        }
+
+        .msg-speak-btn:hover {
+            color: var(--char-color, #6366f1);
+            opacity: 1;
+            transform: scale(1.1);
+        }
+
+        .msg-speak-btn.is-speaking {
+            color: var(--char-color, #6366f1);
+            opacity: 1;
+            animation: speakPulse 1.1s ease-in-out infinite;
+        }
+
+        @keyframes speakPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.18); }
         }
 
         .msg-content {
@@ -1404,6 +1441,7 @@
         let oramaSearch = null;
 
         let currentCharacter = null;
+        let activeSpeechMessageId = null;
         let chatHistory = [];
         let personas = [];
         let memories = [];
@@ -1599,6 +1637,11 @@
         }
 
         async function initChatPage() {
+            // Stimmen für die Sprachausgabe frühzeitig anfordern (manche Browser laden sie asynchron nach)
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.getVoices();
+                window.speechSynthesis.addEventListener('voiceschanged', () => {});
+            }
             // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
             await migrateLegacyLocalStorage();
             await initOrama();
@@ -1667,6 +1710,98 @@
             formatted = formatted.replace(/\n/g, '<br>');
             return formatted;
         }
+
+        // --- Text-to-Speech (Web Speech API) ---
+        function stripTextForSpeech(text) {
+            if (!text) return '';
+            let plain = String(text);
+            plain = plain.replace(/\*\*([^*]+)\*\*/g, '$1');
+            plain = plain.replace(/\*([^*]+)\*/g, '$1');
+            plain = plain.replace(/__([^_]+)__/g, '$1');
+            plain = plain.replace(/_([^_]+)_/g, '$1');
+            plain = plain.replace(/<[^>]+>/g, ' ');
+            plain = plain.replace(/\s+/g, ' ').trim();
+            return plain;
+        }
+
+        function pickVoiceForCharacter() {
+            if (!('speechSynthesis' in window)) return null;
+            const voices = window.speechSynthesis.getVoices();
+            if (!voices.length) return null;
+
+            const voiceSettings = (currentCharacter && currentCharacter.voiceSettings) || {};
+            if (voiceSettings.voiceName) {
+                const exactMatch = voices.find(v => v.name === voiceSettings.voiceName);
+                if (exactMatch) return exactMatch;
+            }
+            if (voiceSettings.voiceLang) {
+                const langMatch = voices.find(v => v.lang === voiceSettings.voiceLang);
+                if (langMatch) return langMatch;
+            }
+            return null;
+        }
+
+        function stopSpeaking() {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            if (activeSpeechMessageId !== null) {
+                activeSpeechMessageId = null;
+                renderChatLog();
+            }
+        }
+
+        function toggleSpeakMessage(messageId) {
+            if (!('speechSynthesis' in window)) {
+                alert('Text-zu-Sprache wird von diesem Browser leider nicht unterstützt. Probier es z.B. mit Chrome, Edge oder Safari.');
+                return;
+            }
+
+            if (activeSpeechMessageId === messageId) {
+                stopSpeaking();
+                return;
+            }
+
+            const msg = chatHistory.find(m => m.id === messageId);
+            if (!msg) return;
+            const plainText = stripTextForSpeech(msg.text);
+            if (!plainText) return;
+
+            window.speechSynthesis.cancel();
+
+            const voiceSettings = (currentCharacter && currentCharacter.voiceSettings) || {};
+            const utterance = new SpeechSynthesisUtterance(plainText);
+            const voice = pickVoiceForCharacter();
+            if (voice) {
+                utterance.voice = voice;
+                utterance.lang = voice.lang;
+            } else if (voiceSettings.voiceLang) {
+                utterance.lang = voiceSettings.voiceLang;
+            }
+            utterance.pitch = typeof voiceSettings.pitch === 'number' ? voiceSettings.pitch : 1;
+            utterance.rate = typeof voiceSettings.rate === 'number' ? voiceSettings.rate : 1;
+
+            utterance.onend = () => {
+                if (activeSpeechMessageId === messageId) {
+                    activeSpeechMessageId = null;
+                    renderChatLog();
+                }
+            };
+            utterance.onerror = () => {
+                if (activeSpeechMessageId === messageId) {
+                    activeSpeechMessageId = null;
+                    renderChatLog();
+                }
+            };
+
+            activeSpeechMessageId = messageId;
+            window.speechSynthesis.speak(utterance);
+            renderChatLog();
+        }
+
+        window.addEventListener('beforeunload', () => {
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        });
 
         async function loadChatHistory() {
             try {
@@ -2013,6 +2148,9 @@
 
             const targetMsg = chatHistory[msgIndex];
             if (!targetMsg) return;
+            if (activeSpeechMessageId && targetMsg.id === activeSpeechMessageId) {
+                stopSpeaking();
+            }
 
             const introGroup = targetMsg.rerollGroupId && String(targetMsg.rerollGroupId).endsWith('_intro');
             const isIntroMessage = Boolean(targetMsg.isIntro || introGroup || (targetMsg.sender === 'bot' && msgIndex === 0 && chatHistory.length > 0 && chatHistory[0].sender === 'bot' && chatHistory[0].isLoading === false));
@@ -2166,6 +2304,7 @@
             if (isWaitingForAI) return;
             const lastBot = getLastVisibleBotMessage();
             if (!lastBot) return;
+            stopSpeaking();
 
             const effectiveName = getCharacterName();
             if (lastBot.rerollGroupId && String(lastBot.rerollGroupId).endsWith('_intro')) {
@@ -2386,6 +2525,16 @@
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                     </button>
                 ` : '';
+                const isSpeakingThis = !isUser && activeSpeechMessageId === msg.id;
+                const speakBtnHtml = (!isUser && !msg.isLoading) ? `
+                    <button type="button" class="msg-speak-btn ${isSpeakingThis ? 'is-speaking' : ''}" title="${isSpeakingThis ? 'Vorlesen stoppen' : 'Nachricht vorlesen'}" onclick="toggleSpeakMessage('${msg.id || ''}')">
+                        ${isSpeakingThis ? `
+                        <svg viewBox="0 0 24 24" style="width:15px; height:15px; fill:currentColor;"><path d="M6 6h12v12H6z"/></svg>
+                        ` : `
+                        <svg viewBox="0 0 24 24" style="width:15px; height:15px; fill:currentColor;"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        `}
+                    </button>
+                ` : '';
 
                 const showRerollControls = isLastBot && !isUser && !introGroup && !msg.isLoading;
                 const showVersionControls = isLastBot && !isUser && !msg.isLoading && groupVersions.length > 1;
@@ -2420,8 +2569,11 @@
                         <div class="msg-bubble-body">
                             <div class="msg-header-row">
                                 <div class="msg-sender-name">${displayName}</div>
-                                ${favoriteBtnHtml}
-                                ${deleteBtnHtml}
+                                <div class="msg-header-actions">
+                                    ${speakBtnHtml}
+                                    ${favoriteBtnHtml}
+                                    ${deleteBtnHtml}
+                                </div>
                             </div>
                             ${contentHtml}
                             ${controlRow}
@@ -2579,6 +2731,8 @@
             const text = inputEl.value.trim();
             if (!text) return;
 
+            stopSpeaking();
+
             const userMessage = {
                 sender: 'user',
                 name: selectedPersona && selectedPersona.name ? selectedPersona.name : 'Du',
@@ -2672,6 +2826,7 @@
 
         async function clearSessionChat() {
             if (confirm("Do you want to reset all chat history with this character?")) {
+                stopSpeaking();
                 try {
                     await db.table('chatHistory').delete(parseInt(currentCharacter.id, 10));
                 } catch (err) {
