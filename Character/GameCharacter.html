@@ -1437,10 +1437,31 @@
             }
         }
 
-        // Orama (dynamic) memory DB handles - will be initialized at runtime
+        // Generic memory DB handles - populated at runtime by either initOrama()
+        // or initTransformerJS(), depending on the user's "Memory System" setting.
+        // Both backends expose the same call shape used throughout this file:
+        //   oramaInsert(oramaDB, { role, content })
+        //   oramaSearch(oramaDB, { term, limit, tolerance }) -> { hits: [{ document: { content } }] }
         let oramaDB = null;
         let oramaInsert = null;
         let oramaSearch = null;
+        let transformerPipeline = null;
+
+        // --- Cross-page sync of the "Model not Loaded / Model loaded" status button
+        // that lives in index.html's settings menu (Task 1). This page loads the
+        // actual Transformer.js pipeline, so it reports status back via
+        // BroadcastChannel (same-browser, instant) and localStorage (fallback / persistence). ---
+        const MODEL_STATUS_KEY = 'storyai_model_status';
+        let modelStatusChannel = null;
+        try {
+            modelStatusChannel = new BroadcastChannel('storyai-model-status');
+        } catch (err) {
+            console.warn('BroadcastChannel not available, falling back to localStorage only:', err);
+        }
+        function reportModelStatus(status) {
+            try { localStorage.setItem(MODEL_STATUS_KEY, status); } catch (err) { /* ignore */ }
+            try { modelStatusChannel?.postMessage({ status }); } catch (err) { /* ignore */ }
+        }
 
         let currentCharacter = null;
         let activeSpeechMessageId = null;
@@ -1544,6 +1565,108 @@
             }
         }
 
+        function cosineSimilarity(a, b) {
+            let dot = 0, normA = 0, normB = 0;
+            for (let i = 0; i < a.length; i++) {
+                dot += a[i] * b[i];
+                normA += a[i] * a[i];
+                normB += b[i] * b[i];
+            }
+            if (normA === 0 || normB === 0) return 0;
+            return dot / (Math.sqrt(normA) * Math.sqrt(normB));
+        }
+
+        // Initializes local, on-device chat memory using @huggingface/transformers.
+        // STRICT RULE: this app does not use external APIs. Both the library and the
+        // model weights must be present locally in the game folder - the Hugging Face
+        // Hub is never contacted, even as a fallback.
+        async function initTransformerJS() {
+            reportModelStatus('loading');
+            try {
+                // Import the local build of the library from your project folder
+                // (e.g. ./libs/transformers.min.js). Do NOT point this at a CDN.
+                const { env, pipeline } = await import('./libs/transformers.min.js');
+
+                // Disable remote model loading from the Hugging Face Hub entirely.
+                env.allowRemoteModels = false;
+                env.allowLocalModels = true;
+                // Specify the custom local path where model weights are hosted.
+                env.localModelPath = '/models/';
+
+                // Allocate the pipeline only after the env is locked to local-only.
+                transformerPipeline = await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
+                    local_files_only: true
+                });
+
+                const embed = async (text) => {
+                    const output = await transformerPipeline(text, { pooling: 'mean', normalize: true });
+                    return Array.from(output.data);
+                };
+
+                // In-memory vector store; drop-in replacement for the Orama handles.
+                const store = [];
+                oramaDB = store;
+
+                oramaInsert = async (db, { role, content }) => {
+                    const embedding = await embed(String(content));
+                    db.push({ role, content: String(content), embedding });
+                };
+
+                oramaSearch = async (db, { term, limit = 3 }) => {
+                    if (!db.length) return { hits: [] };
+                    const queryEmbedding = await embed(String(term));
+                    const hits = db
+                        .map(entry => ({ document: { role: entry.role, content: entry.content }, score: cosineSimilarity(queryEmbedding, entry.embedding) }))
+                        .sort((a, b) => b.score - a.score)
+                        .slice(0, limit);
+                    return { hits };
+                };
+
+                // Load existing chat history into the vector store, mirroring initOrama().
+                const existingMessages = Array.isArray(chatHistory) ? chatHistory : [];
+                const fallbackHistory = existingMessages.length
+                    ? existingMessages
+                    : await (async () => {
+                        try {
+                            const id = parseInt(currentCharacter?.id ?? new URLSearchParams(window.location.search).get('id'), 10);
+                            if (!Number.isFinite(id)) return [];
+                            const row = await db.table('chatHistory').get(id);
+                            return row && Array.isArray(row.history) ? row.history : [];
+                        } catch (err) {
+                            return [];
+                        }
+                    })();
+
+                for (const msg of Array.isArray(fallbackHistory) ? fallbackHistory : []) {
+                    if (!msg) continue;
+                    const role = msg.role || (msg.sender === 'bot' || msg.sender === 'assistant' ? 'assistant' : 'user');
+                    const content = msg.content || msg.text;
+                    if (!content) continue;
+                    await oramaInsert(oramaDB, { role, content: String(content) });
+                }
+
+                reportModelStatus('loaded');
+            } catch (err) {
+                console.warn('Could not initialize Transformer.js pipeline:', err);
+                transformerPipeline = null;
+                oramaDB = null;
+                oramaInsert = async () => [];
+                oramaSearch = async () => [];
+                reportModelStatus('not-loaded');
+            }
+        }
+
+        // Reads the user's "Memory System" preference from Dexie and initializes
+        // the matching backend. Defaults to Orama when unset (null/undefined).
+        async function initMemorySystem() {
+            const preference = settings.memorySystem;
+            if (preference === 'Transformer.js') {
+                await initTransformerJS();
+            } else {
+                await initOrama();
+            }
+        }
+
         function getDraftKey(characterId = null) {
             const id = characterId !== null && characterId !== undefined ? characterId : currentCharacter?.id;
             return id !== null && id !== undefined ? parseInt(id, 10) : null;
@@ -1625,7 +1748,8 @@
         let settings = {
             textSize: 'Middle',
             language: 'English',
-            model: 'StoryAI Ultra v2.5'
+            model: 'StoryAI Ultra v2.5',
+            memorySystem: 'Orama'
         };
 
         async function loadStoredSettings() {
@@ -1646,8 +1770,9 @@
             }
             // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
             await migrateLegacyLocalStorage();
-            await initOrama();
             settings = { ...settings, ...await loadStoredSettings() };
+            // Respect the user's "Memory System" choice from Dexie (Orama or Transformer.js)
+            await initMemorySystem();
             const urlParams = new URLSearchParams(window.location.search);
             const charId = parseInt(urlParams.get('id'), 10);
 
@@ -2914,8 +3039,8 @@
                 }
                 chatHistory = [];
                 renderChatLog();
-                // Reinitialize Orama so the memory DB is reset as well
-                try { await initOrama(); } catch (e) { /* ignore */ }
+                // Reinitialize the active memory backend so it is reset as well
+                try { await initMemorySystem(); } catch (e) { /* ignore */ }
                 generateInitialGreeting();
             }
         }
