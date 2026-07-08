@@ -4,7 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Create Character</title>
+    <!-- Dexie.js für unbegrenzten lokalen Speicher (IndexedDB statt localStorage).
+         Falls die erste CDN-Quelle nicht erreichbar ist (Netzwerkproblem, Ad-Blocker,
+         Firewall o.ä.), wird automatisch auf alternative CDNs ausgewichen, damit die
+         App auch dann funktioniert. -->
     <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="https://unpkg.com/dexie@3.4.2/dist/dexie.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.4.2/dexie.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
+        }
+    </script>
     <style>
         * {
             box-sizing: border-box;
@@ -937,7 +956,14 @@
             renderTags();
         }
 
-        const STORAGE_KEY = 'storyAI_items';
+        // Absicherung: Falls Dexie trotz aller CDN-Fallbacks nicht geladen werden
+        // konnte (z.B. komplett fehlende Internetverbindung), brechen wir hier mit
+        // einer klaren, verständlichen Meldung ab statt mit einem kryptischen
+        // "Dexie is not defined"-Fehler tief im Code.
+        if (typeof Dexie === 'undefined') {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;padding:40px;text-align:center;font-family:sans-serif;color:#f8fafc;background:#09090b;"><div><h1 style="margin-bottom:16px;">⚠️ Speicher-Bibliothek konnte nicht geladen werden</h1><p style="color:#94a3b8;max-width:480px;">Dexie.js (zuständig für den lokalen Speicher) konnte über keine der hinterlegten CDN-Quellen geladen werden. Bitte prüfe deine Internetverbindung oder deaktiviere ggf. einen Ad-Blocker/Firewall-Filter für cdn.jsdelivr.net, unpkg.com und cdnjs.cloudflare.com und lade die Seite neu.</p></div></div>';
+            throw new Error('Dexie ist nicht verfügbar - Initialisierung abgebrochen.');
+        }
 
         const db = new Dexie('StoryAIDatabase');
         db.version(1).stores({
@@ -951,6 +977,182 @@
             displayVersions: 'characterId'
         });
 
+        // --- Persistenter Speicher -----------------------------------------
+        // Bittet den Browser, den Ursprung als "persistent" einzustufen, damit
+        // die IndexedDB-Daten (Dexie) nicht automatisch unter Speicherdruck
+        // gelöscht werden. Das ist der eigentliche Kern von "unbegrenztem"
+        // lokalem Speicher - im Gegensatz zu localStorage (~5-10MB Limit)
+        // erlaubt IndexedDB je nach freiem Festplattenspeicher deutlich mehr.
+        if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persist().then(granted => {
+                console.info(granted
+                    ? 'Persistenter Speicher gewährt – Daten bleiben dauerhaft erhalten.'
+                    : 'Persistenter Speicher nicht gewährt – der Browser könnte Daten unter Speicherdruck entfernen.');
+            }).catch(() => {});
+        }
+
+        // Öffnet die Datenbank explizit, damit Fehler (z.B. IndexedDB im
+        // privaten Browser-Modus deaktiviert) früh erkannt und dem Nutzer
+        // verständlich angezeigt werden, statt später kryptisch zu scheitern.
+        db.open().catch(err => {
+            console.error('IndexedDB konnte nicht geöffnet werden:', err);
+            alert('⚠️ Der lokale Speicher (IndexedDB) konnte nicht initialisiert werden. Manche Browser (z. B. Safari im privaten Modus) unterstützen dies nicht vollständig. Deine Daten können in dieser Sitzung eventuell nicht gespeichert werden.');
+        });
+
+        // --- Einmalige Migration von altem localStorage zu Dexie/IndexedDB -
+        // Frühere Versionen dieser App speicherten alles unter diesen Keys in
+        // localStorage. Damit beim Umstieg auf Dexie niemand seine
+        // vorhandenen Charaktere, Chats, Erinnerungen usw. verliert, werden
+        // eventuell vorhandene localStorage-Daten beim allerersten Start
+        // einmalig in die IndexedDB übernommen und anschließend entfernt.
+        const LEGACY_KEYS = {
+            items: 'storyAI_items',
+            settings: 'storyAI_settings',
+            personas: 'storyAI_personas',
+            selectedPersona: 'storyAI_selected_persona',
+            chatPrefix: 'storyAI_chat_',
+            memoryPrefix: 'storyAI_memories_',
+            favoritesPrefix: 'storyAI_favorite_messages_',
+            versionsPrefix: 'storyAI_versions_',
+            draftPrefix: 'storyAI_draft_',
+            storyPersonaPrefix: 'storyAI_story_persona_'
+        };
+
+        async function migrateLegacyLocalStorage() {
+            try {
+                if (typeof localStorage === 'undefined') return;
+                const already = await db.table('settings').get('legacyLocalStorageMigrated');
+                if (already) return;
+
+                const keysToClear = [];
+
+                const rawItems = localStorage.getItem(LEGACY_KEYS.items);
+                if (rawItems) {
+                    try {
+                        const parsed = JSON.parse(rawItems);
+                        if (Array.isArray(parsed) && parsed.length && (await db.table('characters').count()) === 0) {
+                            await db.table('characters').bulkPut(parsed);
+                        }
+                    } catch (e) { console.warn('Migration items fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.items);
+                }
+
+                const rawSettings = localStorage.getItem(LEGACY_KEYS.settings);
+                if (rawSettings) {
+                    try {
+                        const parsed = JSON.parse(rawSettings);
+                        if (!(await db.table('settings').get(1))) {
+                            await db.table('settings').put({ id: 1, value: parsed });
+                        }
+                    } catch (e) { console.warn('Migration settings fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.settings);
+                }
+
+                const rawPersonas = localStorage.getItem(LEGACY_KEYS.personas);
+                if (rawPersonas) {
+                    try {
+                        const parsed = JSON.parse(rawPersonas);
+                        if (Array.isArray(parsed) && parsed.length && (await db.table('personas').count()) === 0) {
+                            await db.table('personas').bulkPut(parsed);
+                        }
+                    } catch (e) { console.warn('Migration personas fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.personas);
+                }
+
+                const rawSelected = localStorage.getItem(LEGACY_KEYS.selectedPersona);
+                if (rawSelected !== null) {
+                    try {
+                        const parsed = JSON.parse(rawSelected);
+                        if (!(await db.table('settings').get('selectedPersonaId'))) {
+                            await db.table('settings').put({ id: 'selectedPersonaId', value: parsed });
+                        }
+                    } catch (e) { console.warn('Migration selectedPersona fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.selectedPersona);
+                }
+
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (!key) continue;
+
+                    if (key.startsWith(LEGACY_KEYS.chatPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.chatPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const history = JSON.parse(localStorage.getItem(key));
+                                if (Array.isArray(history) && !(await db.table('chatHistory').get(id))) {
+                                    await db.table('chatHistory').put({ characterId: id, history });
+                                }
+                            } catch (e) { console.warn('Migration chatHistory fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.memoryPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.memoryPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                if (!(await db.table('memories').get(id))) {
+                                    await db.table('memories').put({ characterId: id, value });
+                                }
+                            } catch (e) { console.warn('Migration memories fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.favoritesPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.favoritesPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                if (!(await db.table('favorites').get(id))) {
+                                    await db.table('favorites').put({ characterId: id, value });
+                                }
+                            } catch (e) { console.warn('Migration favorites fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.versionsPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.versionsPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                if (!(await db.table('displayVersions').get(id))) {
+                                    await db.table('displayVersions').put({ characterId: id, value });
+                                }
+                            } catch (e) { console.warn('Migration displayVersions fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.draftPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.draftPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const text = localStorage.getItem(key);
+                                if (text && !(await db.table('drafts').get(id))) {
+                                    await db.table('drafts').put({ characterId: id, text });
+                                }
+                            } catch (e) { console.warn('Migration drafts fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.storyPersonaPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.storyPersonaPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                const settingId = `storyPersona_${id}`;
+                                if (!(await db.table('settings').get(settingId))) {
+                                    await db.table('settings').put({ id: settingId, value });
+                                }
+                            } catch (e) { console.warn('Migration storyPersona fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    }
+                }
+
+                keysToClear.forEach(k => localStorage.removeItem(k));
+                await db.table('settings').put({ id: 'legacyLocalStorageMigrated', value: true });
+                if (keysToClear.length) {
+                    console.info(`Migration abgeschlossen: ${keysToClear.length} alte localStorage-Einträge nach IndexedDB übertragen.`);
+                }
+            } catch (err) {
+                console.warn('Fehler bei der Migration von localStorage zu Dexie:', err);
+            }
+        }
         async function loadStoredItems() {
             try {
                 return await db.table('characters').toArray();
@@ -1068,6 +1270,8 @@
 
         // Initial start when loading
         window.addEventListener('DOMContentLoaded', async () => {
+            // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
+            await migrateLegacyLocalStorage();
             await initializeForm();
         });
     </script>
