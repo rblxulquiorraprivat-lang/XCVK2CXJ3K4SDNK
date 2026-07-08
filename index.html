@@ -3,8 +3,27 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Story AI - Premium Hub Dashboard</title>
+    <title>Story AI - Dashboard</title>
+    <!-- Dexie.js für unbegrenzten lokalen Speicher (IndexedDB statt localStorage).
+         Falls die erste CDN-Quelle nicht erreichbar ist (Netzwerkproblem, Ad-Blocker,
+         Firewall o.ä.), wird automatisch auf alternative CDNs ausgewichen, damit die
+         App auch dann funktioniert. -->
     <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="https://unpkg.com/dexie@3.4.2/dist/dexie.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.4.2/dexie.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -905,12 +924,17 @@
     </main>
 
     <script>
-        const STORAGE_KEY = 'storyAI_items';
-        const CHAT_HISTORY_PREFIX = 'storyAI_chat_';
-        const SETTINGS_KEY = 'storyAI_settings';
-        const PERSONA_KEY = 'storyAI_personas';
-        const SELECTED_PERSONA_KEY = 'storyAI_selected_persona';
-        const FILTER_KEY = 'storyAI_last_filter';
+        // Gemeinsame Dexie-Datenbank - MUSS identisch mit dem Schema in
+        // CreateCharacter.html und GameCharacter.html sein, sonst sehen die
+        // Seiten unterschiedliche Daten.
+        // Absicherung: Falls Dexie trotz aller CDN-Fallbacks nicht geladen werden
+        // konnte (z.B. komplett fehlende Internetverbindung), brechen wir hier mit
+        // einer klaren, verständlichen Meldung ab statt mit einem kryptischen
+        // "Dexie is not defined"-Fehler tief im Code.
+        if (typeof Dexie === 'undefined') {
+            document.body.innerHTML = '<div style="display:flex;align-items:center;justify-content:center;height:100vh;padding:40px;text-align:center;font-family:sans-serif;color:#f8fafc;background:#09090b;"><div><h1 style="margin-bottom:16px;">⚠️ Speicher-Bibliothek konnte nicht geladen werden</h1><p style="color:#94a3b8;max-width:480px;">Dexie.js (zuständig für den lokalen Speicher) konnte über keine der hinterlegten CDN-Quellen geladen werden. Bitte prüfe deine Internetverbindung oder deaktiviere ggf. einen Ad-Blocker/Firewall-Filter für cdn.jsdelivr.net, unpkg.com und cdnjs.cloudflare.com und lade die Seite neu.</p></div></div>';
+            throw new Error('Dexie ist nicht verfügbar - Initialisierung abgebrochen.');
+        }
 
         const db = new Dexie('StoryAIDatabase');
         db.version(1).stores({
@@ -924,81 +948,188 @@
             displayVersions: 'characterId'
         });
 
-        async function migrateLocalStorage() {
+        // --- Persistenter Speicher -----------------------------------------
+        // Bittet den Browser, den Ursprung als "persistent" einzustufen, damit
+        // die IndexedDB-Daten (Dexie) nicht automatisch unter Speicherdruck
+        // gelöscht werden. Das ist der eigentliche Kern von "unbegrenztem"
+        // lokalem Speicher - im Gegensatz zu localStorage (~5-10MB Limit)
+        // erlaubt IndexedDB je nach freiem Festplattenspeicher deutlich mehr.
+        if (navigator.storage && navigator.storage.persist) {
+            navigator.storage.persist().then(granted => {
+                console.info(granted
+                    ? 'Persistenter Speicher gewährt – Daten bleiben dauerhaft erhalten.'
+                    : 'Persistenter Speicher nicht gewährt – der Browser könnte Daten unter Speicherdruck entfernen.');
+            }).catch(() => {});
+        }
+
+        // Öffnet die Datenbank explizit, damit Fehler (z.B. IndexedDB im
+        // privaten Browser-Modus deaktiviert) früh erkannt und dem Nutzer
+        // verständlich angezeigt werden, statt später kryptisch zu scheitern.
+        db.open().catch(err => {
+            console.error('IndexedDB konnte nicht geöffnet werden:', err);
+            alert('⚠️ Der lokale Speicher (IndexedDB) konnte nicht initialisiert werden. Manche Browser (z. B. Safari im privaten Modus) unterstützen dies nicht vollständig. Deine Daten können in dieser Sitzung eventuell nicht gespeichert werden.');
+        });
+
+        // --- Einmalige Migration von altem localStorage zu Dexie/IndexedDB -
+        // Frühere Versionen dieser App speicherten alles unter diesen Keys in
+        // localStorage. Damit beim Umstieg auf Dexie niemand seine
+        // vorhandenen Charaktere, Chats, Erinnerungen usw. verliert, werden
+        // eventuell vorhandene localStorage-Daten beim allerersten Start
+        // einmalig in die IndexedDB übernommen und anschließend entfernt.
+        const LEGACY_KEYS = {
+            items: 'storyAI_items',
+            settings: 'storyAI_settings',
+            personas: 'storyAI_personas',
+            selectedPersona: 'storyAI_selected_persona',
+            chatPrefix: 'storyAI_chat_',
+            memoryPrefix: 'storyAI_memories_',
+            favoritesPrefix: 'storyAI_favorite_messages_',
+            versionsPrefix: 'storyAI_versions_',
+            draftPrefix: 'storyAI_draft_',
+            storyPersonaPrefix: 'storyAI_story_persona_'
+        };
+
+        async function migrateLegacyLocalStorage() {
             try {
-                const existingKeys = Object.keys(localStorage);
-                if (!existingKeys.length) return;
+                if (typeof localStorage === 'undefined') return;
+                const already = await db.table('settings').get('legacyLocalStorageMigrated');
+                if (already) return;
 
-                const migrations = [];
-                if (existingKeys.includes(STORAGE_KEY)) {
-                    const raw = localStorage.getItem(STORAGE_KEY);
-                    const items = raw ? JSON.parse(raw) : [];
-                    if (Array.isArray(items)) {
-                        for (const item of items) {
-                            if (item && typeof item.id !== 'undefined') {
-                                migrations.push(db.table('characters').put(item));
-                            }
+                const keysToClear = [];
+
+                const rawItems = localStorage.getItem(LEGACY_KEYS.items);
+                if (rawItems) {
+                    try {
+                        const parsed = JSON.parse(rawItems);
+                        if (Array.isArray(parsed) && parsed.length && (await db.table('characters').count()) === 0) {
+                            await db.table('characters').bulkPut(parsed);
                         }
-                    }
-                    localStorage.removeItem(STORAGE_KEY);
+                    } catch (e) { console.warn('Migration items fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.items);
                 }
 
-                for (const key of existingKeys) {
-                    if (key.startsWith(CHAT_HISTORY_PREFIX)) {
-                        const charId = key.slice(CHAT_HISTORY_PREFIX.length);
-                        const raw = localStorage.getItem(key);
-                        const history = raw ? JSON.parse(raw) : [];
-                        if (Array.isArray(history)) {
-                            migrations.push(db.table('chatHistory').put({ characterId: parseInt(charId, 10), history }));
+                const rawSettings = localStorage.getItem(LEGACY_KEYS.settings);
+                if (rawSettings) {
+                    try {
+                        const parsed = JSON.parse(rawSettings);
+                        if (!(await db.table('settings').get(1))) {
+                            await db.table('settings').put({ id: 1, value: parsed });
                         }
-                        localStorage.removeItem(key);
-                    }
+                    } catch (e) { console.warn('Migration settings fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.settings);
                 }
 
-                if (existingKeys.includes(SETTINGS_KEY)) {
-                    const raw = localStorage.getItem(SETTINGS_KEY);
-                    const value = raw ? JSON.parse(raw) : null;
-                    if (value) {
-                        migrations.push(db.table('settings').put({ id: 1, value }));
-                    }
-                    localStorage.removeItem(SETTINGS_KEY);
-                }
-
-                if (existingKeys.includes(PERSONA_KEY)) {
-                    const raw = localStorage.getItem(PERSONA_KEY);
-                    const value = raw ? JSON.parse(raw) : [];
-                    if (Array.isArray(value)) {
-                        for (const persona of value) {
-                            if (persona && typeof persona.id !== 'undefined') {
-                                migrations.push(db.table('personas').put(persona));
-                            }
+                const rawPersonas = localStorage.getItem(LEGACY_KEYS.personas);
+                if (rawPersonas) {
+                    try {
+                        const parsed = JSON.parse(rawPersonas);
+                        if (Array.isArray(parsed) && parsed.length && (await db.table('personas').count()) === 0) {
+                            await db.table('personas').bulkPut(parsed);
                         }
-                    }
-                    localStorage.removeItem(PERSONA_KEY);
+                    } catch (e) { console.warn('Migration personas fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.personas);
                 }
 
-                if (existingKeys.includes(SELECTED_PERSONA_KEY)) {
-                    const raw = localStorage.getItem(SELECTED_PERSONA_KEY);
-                    const id = raw ? parseInt(raw, 10) : null;
-                    if (id !== null) {
-                        migrations.push(db.table('settings').put({ id: 'selectedPersonaId', value: id }));
-                    }
-                    localStorage.removeItem(SELECTED_PERSONA_KEY);
+                const rawSelected = localStorage.getItem(LEGACY_KEYS.selectedPersona);
+                if (rawSelected !== null) {
+                    try {
+                        const parsed = JSON.parse(rawSelected);
+                        if (!(await db.table('settings').get('selectedPersonaId'))) {
+                            await db.table('settings').put({ id: 'selectedPersonaId', value: parsed });
+                        }
+                    } catch (e) { console.warn('Migration selectedPersona fehlgeschlagen:', e); }
+                    keysToClear.push(LEGACY_KEYS.selectedPersona);
                 }
 
-                if (existingKeys.includes(FILTER_KEY)) {
-                    const raw = localStorage.getItem(FILTER_KEY);
-                    if (raw !== null) {
-                        migrations.push(db.table('settings').put({ id: 'lastFilter', value: raw }));
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (!key) continue;
+
+                    if (key.startsWith(LEGACY_KEYS.chatPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.chatPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const history = JSON.parse(localStorage.getItem(key));
+                                if (Array.isArray(history) && !(await db.table('chatHistory').get(id))) {
+                                    await db.table('chatHistory').put({ characterId: id, history });
+                                }
+                            } catch (e) { console.warn('Migration chatHistory fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.memoryPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.memoryPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                if (!(await db.table('memories').get(id))) {
+                                    await db.table('memories').put({ characterId: id, value });
+                                }
+                            } catch (e) { console.warn('Migration memories fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.favoritesPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.favoritesPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                if (!(await db.table('favorites').get(id))) {
+                                    await db.table('favorites').put({ characterId: id, value });
+                                }
+                            } catch (e) { console.warn('Migration favorites fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.versionsPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.versionsPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                if (!(await db.table('displayVersions').get(id))) {
+                                    await db.table('displayVersions').put({ characterId: id, value });
+                                }
+                            } catch (e) { console.warn('Migration displayVersions fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.draftPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.draftPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const text = localStorage.getItem(key);
+                                if (text && !(await db.table('drafts').get(id))) {
+                                    await db.table('drafts').put({ characterId: id, text });
+                                }
+                            } catch (e) { console.warn('Migration drafts fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
+                    } else if (key.startsWith(LEGACY_KEYS.storyPersonaPrefix)) {
+                        const id = parseInt(key.slice(LEGACY_KEYS.storyPersonaPrefix.length), 10);
+                        if (Number.isFinite(id)) {
+                            try {
+                                const value = JSON.parse(localStorage.getItem(key));
+                                const settingId = `storyPersona_${id}`;
+                                if (!(await db.table('settings').get(settingId))) {
+                                    await db.table('settings').put({ id: settingId, value });
+                                }
+                            } catch (e) { console.warn('Migration storyPersona fehlgeschlagen für', key, e); }
+                        }
+                        keysToClear.push(key);
                     }
-                    localStorage.removeItem(FILTER_KEY);
                 }
 
-                await Promise.all(migrations);
+                keysToClear.forEach(k => localStorage.removeItem(k));
+                await db.table('settings').put({ id: 'legacyLocalStorageMigrated', value: true });
+                if (keysToClear.length) {
+                    console.info(`Migration abgeschlossen: ${keysToClear.length} alte localStorage-Einträge nach IndexedDB übertragen.`);
+                }
             } catch (err) {
-                console.warn('LocalStorage migration failed:', err);
+                console.warn('Fehler bei der Migration von localStorage zu Dexie:', err);
             }
         }
+        let settings = {
+            textSize: 'Middle',
+            language: 'English',
+            model: 'StoryAI Ultra v2.5',
+            apiKey: ''
+        };
 
         async function loadLastFilter() {
             try {
@@ -1028,14 +1159,6 @@
             }
         }
 
-        async function saveSettings() {
-            try {
-                await db.table('settings').put({ id: 1, value: settings });
-            } catch (err) {
-                console.warn('Error saving settings:', err);
-            }
-        }
-
         async function loadStoredPersonas() {
             try {
                 return await db.table('personas').toArray();
@@ -1045,12 +1168,14 @@
             }
         }
 
-        async function savePersonas(personas) {
+        async function savePersonas(personasToSave) {
             try {
-                await db.table('personas').clear();
-                if (Array.isArray(personas)) {
-                    await db.table('personas').bulkPut(personas);
-                }
+                await db.transaction('rw', db.personas, async () => {
+                    await db.personas.clear();
+                    if (Array.isArray(personasToSave)) {
+                        await db.personas.bulkPut(personasToSave);
+                    }
+                });
             } catch (err) {
                 console.warn('Error saving personas:', err);
             }
@@ -1078,6 +1203,69 @@
             }
         }
 
+        async function saveSettings() {
+            try {
+                await db.table('settings').put({ id: 1, value: settings });
+            } catch (err) {
+                console.warn('Error saving settings:', err);
+            }
+        }
+
+        async function setSetting(key, value) {
+            settings[key] = value;
+            await saveSettings();
+            renderMainArea();
+        }
+
+        let personas = [];
+        let selectedPersonaId = null;
+        let items = [];
+
+        const defaultItems = [
+            {
+                id: 1, type: 'character', name: 'Konata Izumi', subtitle: 'Anime Otaku • Fröhlich',
+                description: 'Konata ist eine extrem passionierte Otaku-Schülerin, die ihre Zeit am liebsten mit Video- und Online-Spielen verbringt.',
+                avatar: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&q=80',
+                color: '#ec4899', tags: ['Anime', 'Otaku', 'Comedy'], lastPlayed: Date.now() - 10000,
+                engine: 'StoryAI Ultra v2.5', favorite: false
+            },
+            {
+                id: 2, type: 'character', name: 'Kotonoha Katsura', subtitle: 'Schülerin • Schüchtern',
+                description: 'Kotonoha ist eine sanftmütige, höfliche und sehr schüchterne Oberschülerin aus einer wohlhabenden Familie.',
+                avatar: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&q=80',
+                color: '#3b82f6', tags: ['Drama', 'Schülerin', 'Romance'], lastPlayed: Date.now() - 50000,
+                engine: 'Roleplay-Claude', favorite: false
+            },
+            {
+                id: 3, type: 'world', name: 'Neo-Tokyo 2077', subtitle: 'Cyberpunk RPG Hub',
+                description: 'Eine gigantische, von Neonlicht durchflutete Megacity der Zukunft. Konzerne kontrollieren das Leben.',
+                avatar: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400&q=80',
+                color: '#10b981', tags: ['Cyberpunk', 'Sci-Fi', 'Action'], lastPlayed: Date.now() - 120000,
+                engine: 'Llama-3-70B', favorite: false
+            },
+            {
+                id: 4, type: 'story', name: 'Der letzte Funke', subtitle: 'Sci-Fi • Interaktives Abenteuer',
+                description: 'Die Menschheit hat die fernen Sterne erreicht, doch die Zentral-Sonne deines Sektors stirbt unaufhaltsam.',
+                avatar: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?w=400&q=80',
+                color: '#8b5cf6', tags: ['Sci-Fi', 'Weltall', 'Drama'], lastPlayed: Date.now() - 5000,
+                engine: 'StoryAI Ultra v2.5', favorite: false
+            },
+            {
+                id: 5, type: 'story', name: 'Schatten über Dunwall', subtitle: 'Dark Fantasy • Mystery',
+                description: 'In den nebligen Gassen einer viktorianischen Küstenstadt geht eine unheimliche Magie um.',
+                avatar: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&q=80',
+                color: '#f59e0b', tags: ['Fantasy', 'Magie', 'Mystery'], lastPlayed: Date.now() - 300000,
+                engine: 'Llama-3-70B', favorite: false
+            },
+            {
+                id: 6, type: 'character', name: 'Aria Nebelfrost', subtitle: 'Elfen-Waldläuferin',
+                description: 'Eine geschickte Bogenschützin aus den tiefen Wäldern, die das Gleichgewicht der Natur schützt.',
+                avatar: 'https://images.unsplash.com/photo-1534367507873-d2d7e24c797f?w=400&q=80',
+                color: '#22c55e', tags: ['Fantasy', 'Elf', 'Abenteuer'], lastPlayed: Date.now() - 800000,
+                engine: 'StoryAI Ultra v2.5', favorite: false
+            }
+        ];
+
         async function loadStoredItems() {
             try {
                 return await db.table('characters').toArray();
@@ -1100,23 +1288,38 @@
             }
         }
 
-        async function getStoryMessageCount(itemId) {
+        // Nachrichten-Zähler werden einmal beim Laden aus der chatHistory-Tabelle
+        // vorberechnet, damit renderLibraryGrid() weiterhin synchron bleiben kann.
+        let chatMessageCounts = {};
+
+        async function refreshChatMessageCounts() {
+            chatMessageCounts = {};
             try {
-                const row = await db.table('chatHistory').get(parseInt(itemId, 10));
-                const history = row?.history ?? [];
-                if (!Array.isArray(history)) return 0;
-                const seenGroups = new Set();
-                return history.reduce((count, msg) => {
-                    if (msg.rerollGroupId) {
-                        if (seenGroups.has(msg.rerollGroupId)) return count;
-                        seenGroups.add(msg.rerollGroupId);
-                        return count + 1;
-                    }
-                    return count + 1;
-                }, 0);
+                const rows = await db.table('chatHistory').toArray();
+                rows.forEach(row => {
+                    const history = Array.isArray(row.history) ? row.history : [];
+                    const seenGroups = new Set();
+                    const count = history.reduce((total, msg) => {
+                        if (msg.rerollGroupId) {
+                            if (seenGroups.has(msg.rerollGroupId)) return total;
+                            seenGroups.add(msg.rerollGroupId);
+                            return total + 1;
+                        }
+                        return total + 1;
+                    }, 0);
+                    chatMessageCounts[row.characterId] = count;
+                });
             } catch (err) {
-                return 0;
+                console.warn('Error loading chat message counts:', err);
             }
+        }
+
+        function getStoryMessageCount(itemId) {
+            return chatMessageCounts[itemId] || 0;
+        }
+
+        function generateNewItemId() {
+            return items.reduce((maxId, item) => Math.max(maxId, item.id || 0), 0) + 1;
         }
 
         async function createStoryFromCharacter(characterId) {
@@ -1146,99 +1349,6 @@
             window.location.href = `Character/GameCharacter.html?id=${newStory.id}`;
         }
 
-        let settings = {
-            textSize: 'Middle',
-            language: 'English',
-            model: 'StoryAI Ultra v2.5',
-            apiKey: ''
-        };
-
-
-        async function setSetting(key, value) {
-            settings[key] = value;
-            await saveSettings();
-            renderMainArea();
-        }
-
-        let personas = [];
-        let selectedPersonaId = null;
-        let items = [];
-        let storyMessageCounts = new Map();
-
-        async function preloadStoryMessageCounts() {
-            try {
-                const histories = await db.table('chatHistory').toArray();
-                storyMessageCounts = new Map(
-                    histories.map(row => {
-                        const history = Array.isArray(row.history) ? row.history : [];
-                        const seenGroups = new Set();
-                        const count = history.reduce((num, msg) => {
-                            if (msg && msg.rerollGroupId) {
-                                if (seenGroups.has(msg.rerollGroupId)) return num;
-                                seenGroups.add(msg.rerollGroupId);
-                                return num + 1;
-                            }
-                            return num + 1;
-                        }, 0);
-                        return [String(row.characterId), count];
-                    })
-                );
-            } catch (err) {
-                console.warn('Error preloading story message counts:', err);
-                storyMessageCounts = new Map();
-            }
-        }
-
-        async function initializeApp() {
-            await migrateLocalStorage();
-            settings = { ...settings, ...await loadStoredSettings() };
-            personas = await loadStoredPersonas();
-            selectedPersonaId = await loadSelectedPersonaId();
-            items = await loadStoredItems();
-
-            const filteredStoredItems = items.filter(item => !isLegacyDemoItem(item));
-            const merged = new Map(items.map(item => [item.id, item]));
-            filteredStoredItems.forEach(item => merged.set(item.id, item));
-            items = Array.from(merged.values());
-
-            if (filteredStoredItems.length !== items.length) {
-                await saveStoredItems(items);
-            } else if (items.length === 0) {
-                await saveStoredItems(items);
-            }
-
-            const loadedFilter = await loadLastFilter();
-            if (validFilters.includes(loadedFilter)) {
-                if (loadedFilter === 'favorite' && !items.some(item => item.favorite)) {
-                    currentFilter = 'all';
-                    await saveLastFilter('all');
-                } else {
-                    currentFilter = loadedFilter;
-                }
-            }
-
-            await preloadStoryMessageCounts();
-            renderApp();
-        }
-
-        function isLegacyDemoItem(item) {
-            if (!item) return false;
-            const legacyIds = new Set([1, 2, 3, 4, 5, 6]);
-            const legacyNames = new Set([
-                'Konata Izumi',
-                'Kotonoha Katsura',
-                'Neo-Tokyo 2077',
-                'Der letzte Funke',
-                'Schatten über Dunwall',
-                'Aria Nebelfrost'
-            ]);
-            return legacyIds.has(item.id) || legacyNames.has(item.name);
-        }
-
-        function generateNewItemId() {
-            return Date.now(); // Verhindert ID-Wiederverwendung und damit Ghost-Stories
-        }
-
         let activeId = null;
         let isSettingsActive = false;
         let isPersonaActive = false;
@@ -1250,6 +1360,47 @@
         let personaViewSearchQuery = '';
 
         const validFilters = ['all', 'character', 'world', 'story', 'favorite'];
+
+        async function initApp() {
+            // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
+            await migrateLegacyLocalStorage();
+
+            // Settings, Personas & ausgewählte Persona aus der DB laden
+            const storedSettings = await loadStoredSettings();
+            settings = { ...settings, ...storedSettings };
+            personas = await loadStoredPersonas();
+            selectedPersonaId = await loadSelectedPersonaId();
+
+            // Bibliothekseinträge laden und mit den Default-Beispieleinträgen zusammenführen.
+            // Beim allerersten Start (leere DB) werden die Beispiele einmalig in die DB geschrieben.
+            const storedItems = await loadStoredItems();
+            if (storedItems.length) {
+                const merged = new Map(defaultItems.map(item => [item.id, item]));
+                storedItems.forEach(item => {
+                    merged.set(item.id, item);
+                });
+                items = Array.from(merged.values());
+            } else {
+                items = [...defaultItems];
+                await saveStoredItems(items);
+            }
+
+            // Nachrichten-Zähler für die Story-Badges vorbereiten
+            await refreshChatMessageCounts();
+
+            // Zuletzt verwendeten Filter wiederherstellen
+            const loadedFilter = await loadLastFilter();
+            if (validFilters.includes(loadedFilter)) {
+                if (loadedFilter === 'favorite' && !items.some(item => item.favorite)) {
+                    currentFilter = 'all';
+                    await saveLastFilter('all');
+                } else {
+                    currentFilter = loadedFilter;
+                }
+            }
+
+            renderApp();
+        }
 
         function timeAgo(timestamp) {
             const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -1345,10 +1496,10 @@
             grid.innerHTML = gridHTML || '<p style="color:var(--text-muted); grid-column:1/-1;">No entries found.</p>';
         }
 
-        function setFilter(type) {
+        async function setFilter(type) {
             if (currentFilter === type) return;
             currentFilter = type;
-            saveLastFilter(type);
+            await saveLastFilter(type);
             if (!isSettingsActive && activeId === null) {
                 renderFilterTabs();
                 renderLibraryGrid();
@@ -1366,12 +1517,13 @@
             renderMainArea();
         }
 
-        function openDetail(id) {
+        async function openDetail(id) {
             isSettingsActive = false;
             activeId = id;
             const itemIndex = items.findIndex(i => i.id === id);
             if(itemIndex !== -1) {
                 items[itemIndex].lastPlayed = Date.now();
+                await saveStoredItems(items);
             }
             renderApp();
         }
@@ -1397,7 +1549,7 @@
             renderApp();
         }
 
-        function savePersona(event) {
+        async function savePersona(event) {
             event.preventDefault();
             const name = document.getElementById('personaName').value.trim();
             const cover = document.getElementById('personaCover').value.trim();
@@ -1431,12 +1583,12 @@
                 personas.unshift(newPersona);
                 if (!selectedPersonaId) {
                     selectedPersonaId = newPersona.id;
-                    saveSelectedPersonaId(selectedPersonaId);
+                    await saveSelectedPersonaId(selectedPersonaId);
                 }
                 alert('Persona has been saved.');
             }
 
-            savePersonas(personas);
+            await savePersonas(personas);
             renderApp();
 
             document.getElementById('personaName').value = '';
@@ -1452,29 +1604,29 @@
             renderApp();
         }
 
-        function deletePersona(id) {
+        async function deletePersona(id) {
             if (!confirm('Really delete this persona?')) return;
             personas = personas.filter(p => p.id !== id);
             if (selectedPersonaId === id) {
                 selectedPersonaId = personas.length ? personas[0].id : null;
-                saveSelectedPersonaId(selectedPersonaId);
+                await saveSelectedPersonaId(selectedPersonaId);
             }
-            savePersonas(personas);
+            await savePersonas(personas);
             if (editingPersonaId === id) {
                 editingPersonaId = null;
             }
             renderApp();
         }
 
-        function setSelectedPersona(id) {
+        async function setSelectedPersona(id) {
             selectedPersonaId = id;
-            saveSelectedPersonaId(id);
+            await saveSelectedPersonaId(id);
             renderApp();
         }
 
-        function clearSelectedPersona() {
+        async function clearSelectedPersona() {
             selectedPersonaId = null;
-            saveSelectedPersonaId(null);
+            await saveSelectedPersonaId(null);
             renderApp();
         }
 
@@ -1517,18 +1669,18 @@
             renderApp();
         }
 
-        function saveItemName(event) {
+        async function saveItemName(event) {
             event.preventDefault();
             const item = items.find(i => i.id === editingItemId);
             if (!item) return;
             const nameInput = document.getElementById('editItemName');
             if (!nameInput) return;
             item.name = nameInput.value.trim() || item.name;
-            saveStoredItems(items);
+            await saveStoredItems(items);
             closeItemEdit();
         }
 
-        function duplicateItem(id) {
+        async function duplicateItem(id) {
             const item = items.find(i => i.id === id);
             if (!item) return;
             const newItem = {
@@ -1539,29 +1691,15 @@
                 favorite: false
             };
             items.unshift(newItem);
-            saveStoredItems(items);
+            await saveStoredItems(items);
             renderApp();
         }
 
         async function deleteItem(id) {
             if (!confirm('Really delete this entry?')) return;
-            try {
-                await db.table('characters').delete(id);
-                await db.table('chatHistory').delete(parseInt(id, 10));
-            } catch (err) {
-                console.warn('Error deleting item or its chat history:', err);
-            }
-
-            items = await loadStoredItems();
-
-            // Falls das gelöschte Item gerade aktiv oder im Edit-Modus war
-            if (activeId === id) {
-                goBackToLibrary();
-            } else if (editingItemId === id) {
-                closeItemEdit();
-            } else {
-                renderApp();
-            }
+            items = items.filter(i => i.id !== id);
+            await saveStoredItems(items);
+            closeItemEdit();
         }
 
         function playItem(id) {
@@ -1575,12 +1713,13 @@
         }
 
         /* Favoriten umschalten */
-        function toggleFavorite(event, id) {
+        async function toggleFavorite(event, id) {
             event.stopPropagation(); // Verhindert das Öffnen der Detailansicht
             const item = items.find(i => i.id === id);
             if (item) {
                 item.favorite = !item.favorite;
-                
+                await saveStoredItems(items);
+
                 // Falls kein Favorit mehr existiert und man im Favoriten-Tab war, zurück zu 'all' springen
                 const hasFavorites = items.some(i => i.favorite);
                 if (currentFilter === 'favorite' && !hasFavorites) {
@@ -1790,7 +1929,7 @@
                                         <h4>Own API Key</h4>
                                         <p>Use your own API key for unlimited generations.</p>
                                     </div>
-                                    <input type="password" placeholder="sk-proj-................" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; width: 250px;">
+                                    <input type="password" id="settingsApiKey" value="${settings.apiKey || ''}" onchange="setSetting('apiKey', this.value)" placeholder="sk-proj-................" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; width: 250px;">
                                 </div>
                             </div>
 
@@ -1861,7 +2000,6 @@
                                     <div class="card-actions">
                                         <button class="card-btn card-btn-play" onclick="${actionHandler}">${actionLabel}</button>
                                         <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); ${isStory ? `openItemEdit(${item.id})` : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`}">Edit</button>
-                                        <button class="card-btn card-btn-delete" style="flex: 0 0 40px; padding: 8px 0;" onclick="event.stopPropagation(); deleteItem(${item.id})" title="Delete">🗑️</button>
                                     </div>
                                 </div>
                             </div>
@@ -1931,10 +2069,7 @@
                                     <h3>⚙️ Setup</h3>
                                     <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">KI Engine:</p>
                                     <p style="font-weight: 600; margin-bottom: 15px;">${item.engine}</p>
-                                    <div style="display: flex; gap: 8px;">
-                                        <button style="flex: 1; padding:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; cursor:pointer;" onclick="${item.type === 'story' ? `openItemEdit(${item.id})` : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`}">Edit</button>
-                                        <button style="flex: 0 0 44px; padding:10px; background:rgba(244, 63, 94, 0.12); border:1px solid rgba(244, 63, 94, 0.25); color:#fda4af; border-radius:10px; cursor:pointer;" onclick="deleteItem(${item.id})" title="Delete">🗑️</button>
-                                    </div>
+                                    <button style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; cursor:pointer;" onclick="${item.type === 'story' ? `openItemEdit(${item.id})` : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`}">Edit</button>
                                 </div>
                             </div>
                         </div>
@@ -1948,11 +2083,8 @@
             renderMainArea();
         }
 
-        // Initialisierung
-        initializeApp().catch(err => {
-            console.error('App initialization failed:', err);
-            renderApp();
-        });
+        // Initialisierung: erst alle Daten aus IndexedDB (Dexie) laden, dann rendern.
+        initApp();
     </script>
 </body>
 </html>
