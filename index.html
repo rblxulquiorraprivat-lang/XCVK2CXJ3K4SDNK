@@ -1144,8 +1144,73 @@
             textSize: 'Middle',
             language: 'English',
             model: 'StoryAI Ultra v2.5',
-            apiKey: ''
+            apiKey: '',
+            memorySystem: 'Orama'
         };
+
+        // --- Transformer.js model status (synced across pages, since the actual
+        // pipeline is loaded on the chat page / GameCharacter.html) ---
+        const MODEL_STATUS_KEY = 'storyai_model_status';
+        let modelStatus = localStorage.getItem(MODEL_STATUS_KEY) || 'not-loaded'; // 'not-loaded' | 'loading' | 'loaded'
+
+        let modelStatusChannel = null;
+        try {
+            modelStatusChannel = new BroadcastChannel('storyai-model-status');
+            modelStatusChannel.onmessage = (event) => {
+                if (event?.data?.status) {
+                    modelStatus = event.data.status;
+                    renderMainArea();
+                }
+            };
+        } catch (err) {
+            console.warn('BroadcastChannel not available, falling back to localStorage only:', err);
+        }
+
+        // Picks up status changes made in another tab (e.g. GameCharacter.html) that
+        // don't support BroadcastChannel, or happened while this tab was inactive.
+        window.addEventListener('storage', (event) => {
+            if (event.key === MODEL_STATUS_KEY && event.newValue) {
+                modelStatus = event.newValue;
+                renderMainArea();
+            }
+        });
+
+        function setModelStatus(status) {
+            modelStatus = status;
+            try { localStorage.setItem(MODEL_STATUS_KEY, status); } catch (err) { /* ignore */ }
+            try { modelStatusChannel?.postMessage({ status }); } catch (err) { /* ignore */ }
+            renderMainArea();
+        }
+
+        async function setMemorySystem(value) {
+            await setSetting('memorySystem', value);
+        }
+
+        // Loads the local Transformer.js embedding pipeline directly from the settings
+        // page so the user can "warm up" / verify the model without opening a chat.
+        // STRICT RULE: no external APIs — only files inside the local /models/ folder.
+        async function loadTransformerModelFromSettings() {
+            if (modelStatus === 'loading') return;
+            setModelStatus('loading');
+            try {
+                // Load the transformers.js library from the local project folder, not a CDN.
+                const { env, pipeline } = await import('./libs/transformers.min.js');
+
+                env.allowRemoteModels = false;   // never hit the Hugging Face Hub
+                env.allowLocalModels = true;
+                env.localModelPath = '/models/'; // models must live in this local folder
+
+                await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
+                    local_files_only: true
+                });
+
+                setModelStatus('loaded');
+            } catch (err) {
+                console.warn('Could not load local Transformer.js model:', err);
+                setModelStatus('not-loaded');
+                alert('Could not load the local model. Make sure it is placed inside your /models/ folder.');
+            }
+        }
 
         async function loadLastFilter() {
             try {
@@ -2005,6 +2070,39 @@
                                         <option value="French" ${settings.language === 'French' ? 'selected' : ''}>French</option>
                                     </select>
                                 </div>
+                                <div class="settings-row">
+                                    <div class="settings-row-info">
+                                        <h4>Memory System</h4>
+                                        <p>Choose how the AI remembers your conversation history.</p>
+                                    </div>
+                                    <select id="settingsMemorySystem" onchange="setMemorySystem(this.value)" style="background: #27272a; color:#fff; border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 10px; font-weight:600;">
+                                        <option value="Orama" ${settings.memorySystem === 'Orama' ? 'selected' : ''}>Orama</option>
+                                        <option value="Transformer.js" ${settings.memorySystem === 'Transformer.js' ? 'selected' : ''}>Transformer.js</option>
+                                    </select>
+                                </div>
+                                ${settings.memorySystem === 'Transformer.js' ? `
+                                <div class="settings-row" id="loadModelRow">
+                                    <div class="settings-row-info">
+                                        <h4>Load Model</h4>
+                                        <p>Loads the local embedding model used for Transformer.js memory. No external servers are contacted.</p>
+                                    </div>
+                                    <button
+                                        id="modelStatusBtn"
+                                        onclick="loadTransformerModelFromSettings()"
+                                        ${modelStatus === 'loading' ? 'disabled' : ''}
+                                        style="
+                                            padding: 8px 16px;
+                                            border-radius: 10px;
+                                            border: none;
+                                            font-weight: 600;
+                                            cursor: ${modelStatus === 'loading' ? 'wait' : 'pointer'};
+                                            transition: background-color 0.2s ease, color 0.2s ease;
+                                            background: ${modelStatus === 'loaded' ? '#22c55e' : '#ef4444'};
+                                            color: ${modelStatus === 'loaded' ? '#052e13' : '#3f0d0d'};
+                                        "
+                                    >${modelStatus === 'loaded' ? 'Model loaded' : (modelStatus === 'loading' ? 'Loading model…' : 'Model not Loaded')}</button>
+                                </div>
+                                ` : ''}
                                 <div class="settings-row">
                                     <div class="settings-row-info">
                                         <h4>Own API Key</h4>
