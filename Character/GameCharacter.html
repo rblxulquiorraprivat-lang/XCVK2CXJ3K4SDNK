@@ -205,6 +205,8 @@
             --color-primary-glow: rgba(99, 102, 241, 0.25);
             --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
             --char-color: #6366f1;
+            --ambient-blur: 80px;
+            --ambient-opacity: 0.15;
         }
 
         body {
@@ -224,7 +226,7 @@
             bottom: 0;
             background-size: cover;
             background-position: center;
-            filter: blur(80px) opacity(0.15);
+            filter: blur(var(--ambient-blur)) opacity(var(--ambient-opacity));
             transform: scale(1.1);
             z-index: 0;
             pointer-events: none;
@@ -1665,7 +1667,48 @@
 
             document.documentElement.style.setProperty('--char-color', currentCharacter.color || '#6366f1');
 
-            document.getElementById('ambientBg').style.backgroundImage = `url('${currentCharacter.avatar}')`;
+            const normalizeCoverUrl = (value) => {
+                const url = (typeof value === 'string' ? value : '').trim();
+                if (!url) return '';
+                if (url.startsWith('//')) return `https:${url}`;
+                if (url.startsWith('http://')) return `https://${url.slice('http://'.length)}`;
+                return url;
+            };
+
+            const storySourceCharacter = (() => {
+                if (!currentCharacter || currentCharacter.type !== 'story') return null;
+                const candidates = [];
+                if (typeof currentCharacter.characterName === 'string' && currentCharacter.characterName.trim()) {
+                    candidates.push(currentCharacter.characterName.trim());
+                }
+                if (typeof currentCharacter.name === 'string' && currentCharacter.name.trim()) {
+                    candidates.push(currentCharacter.name.replace(/^Story:\s*/i, '').trim());
+                }
+                const wanted = candidates.find(Boolean);
+                if (!wanted) return null;
+                return items.find(i => i && i.type === 'character' && typeof i.name === 'string' && i.name.trim() === wanted) || null;
+            })();
+
+            const coverUrl = normalizeCoverUrl(currentCharacter.backgroundURL) || normalizeCoverUrl(storySourceCharacter?.backgroundURL);
+            const shouldUseCover = Boolean(coverUrl);
+            const backgroundUrl = shouldUseCover ? coverUrl : currentCharacter.avatar;
+            const blurPx = (() => {
+                const fromData = (typeof currentCharacter.backgroundBlurPx === 'number' && Number.isFinite(currentCharacter.backgroundBlurPx))
+                    ? currentCharacter.backgroundBlurPx
+                    : ((typeof currentCharacter.backgroundBlur === 'number' && Number.isFinite(currentCharacter.backgroundBlur)) ? currentCharacter.backgroundBlur : null);
+                if (fromData !== null) return Math.min(60, Math.max(0, Math.round(fromData)));
+
+                const fromSource = (typeof storySourceCharacter?.backgroundBlurPx === 'number' && Number.isFinite(storySourceCharacter.backgroundBlurPx))
+                    ? storySourceCharacter.backgroundBlurPx
+                    : ((typeof storySourceCharacter?.backgroundBlur === 'number' && Number.isFinite(storySourceCharacter.backgroundBlur)) ? storySourceCharacter.backgroundBlur : null);
+                if (fromSource !== null) return Math.min(60, Math.max(0, Math.round(fromSource)));
+
+                return shouldUseCover ? 15 : 80;
+            })();
+            const opacity = shouldUseCover ? 0.32 : 0.15;
+            document.documentElement.style.setProperty('--ambient-blur', `${blurPx}px`);
+            document.documentElement.style.setProperty('--ambient-opacity', String(opacity));
+            document.getElementById('ambientBg').style.backgroundImage = `url('${backgroundUrl}')`;
             document.getElementById('topbarAvatar').style.backgroundImage = `url('${currentCharacter.avatar}')`;
             document.getElementById('topbarName').innerText = currentCharacter.name;
             memories = await loadMemories();

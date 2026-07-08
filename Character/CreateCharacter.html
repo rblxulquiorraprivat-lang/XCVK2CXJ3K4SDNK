@@ -148,6 +148,89 @@
             gap: 8px;
         }
 
+        .form-section {
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            background: linear-gradient(180deg, rgba(255,255,255,0.03), rgba(0,0,0,0.18));
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.06);
+            overflow: hidden;
+            margin: 18px 0;
+        }
+
+        .form-section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+            padding: 14px 16px;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            background: rgba(0,0,0,0.12);
+        }
+
+        .form-section-heading {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .form-section-number {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 800;
+            color: #fff;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            flex: 0 0 auto;
+        }
+
+        .form-section-text {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            min-width: 0;
+        }
+
+        .form-section-title {
+            font-size: 1.02rem;
+            font-weight: 800;
+            letter-spacing: 0.2px;
+            color: #fff;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .form-section-desc {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            line-height: 1.35;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .form-section-icon {
+            width: 34px;
+            height: 34px;
+            border-radius: 12px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #e5e7eb;
+            flex: 0 0 auto;
+        }
+
+        .form-section-body {
+            padding: 16px 16px 4px 16px;
+        }
+
         /* Form Controls & Styling */
         .form-group {
             margin-bottom: 20px;
@@ -552,6 +635,18 @@
                 font-size: 0.9rem;
             }
 
+            .form-section {
+                border-radius: 18px;
+            }
+
+            .form-section-header {
+                padding: 12px 14px;
+            }
+
+            .form-section-body {
+                padding: 14px 14px 2px 14px;
+            }
+
             .form-group.row-2 {
                 grid-template-columns: 1fr;
                 gap: 16px;
@@ -621,6 +716,17 @@
                 font-size: 0.94rem;
             }
 
+            .form-section-number,
+            .form-section-icon {
+                width: 32px;
+                height: 32px;
+                border-radius: 11px;
+            }
+
+            .form-section-title {
+                font-size: 0.98rem;
+            }
+
             .live-avatar-frame {
                 width: 72px;
                 height: 72px;
@@ -659,140 +765,201 @@
 
             <form id="characterForm" onsubmit="handleFormSubmit(event)">
                 
-                <div class="section-subtitle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-                    1. Identity & System Data
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charStoryName">Character Name</label>
-                    <input type="text" id="charStoryName" class="form-control" placeholder="e.g., Konata Izumi" required oninput="updatePreview()">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charShortDesc">Short Desc <span style="font-weight:400; color: var(--text-muted); text-transform:none;">(optional)</span></label>
-                    <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" oninput="updatePreview()">
-                </div>
-
-                <div class="section-subtitle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
-                    2. Character Properties
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charAppearance">Appearance</label>
-                    <textarea id="charAppearance" class="form-control" placeholder="Blue hair, ahoge, small stature, sleepy eyes..." oninput="updatePreview()"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charPersonality">Personality</label>
-                    <textarea id="charPersonality" class="form-control" placeholder="Exzentrisch, sarkastisch, freundlich, extrem leidenschaftlich bezüglich Videospielen und Animes..." oninput="updatePreview()"></textarea>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Introductions</label>
-                    <div class="dynamic-list-container">
-                        <div class="dynamic-input-row">
-                            <input type="text" id="introInput" class="form-control" placeholder="e.g., 'I have always observed the stars...'">
-                            <button type="button" class="btn-add-dynamic" onclick="addIntroduction()">Add</button>
-                        </div>
-                        <div id="introductionsListDisplay" class="secrets-list-display"></div>
-                        <div id="introductionHelp" style="font-size:0.85rem; color:var(--text-muted); margin-top:8px;">
-                            At least 1 introduction. Maximum 10 introductions.
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charGenerally">Generally</label>
-                    <textarea id="charGenerally" class="form-control" placeholder="Arbeitet in einem Cosplay-Café. Hasst es, für die Schule zu lernen und macht alles in der letzten Nacht..." oninput="updatePreview()"></textarea>
-                </div>
-
-                <div class="section-subtitle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
-                    3. Visual Assets & Cosmetics
-                </div>
-
-                <div class="form-group row-2">
-                    <div>
-                        <label class="form-label" for="charAvatar">Avatar Image URL</label>
-                        <input type="url" id="charAvatar" class="form-control" placeholder="https://images.unsplash.com/..." oninput="updatePreview()">
-                    </div>
-                    <div>
-                        <label class="form-label" for="charCoverUrl">Banner Cover URL</label>
-                        <input type="url" id="charCoverUrl" class="form-control" placeholder="Optionales Hintergrundbild..." oninput="updatePreview()">
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label" for="charColor">Hex Theme Color Accent</label>
-                    <input type="color" id="charColor" class="form-control" value="#6366f1" oninput="updatePreview()">
-                </div>
-
-                <div class="section-subtitle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H8.9V6zM18 20H6V10h12v10z"/></svg>
-                    4. Relational Metadata (Tags & Secrets)
-                </div>
-
-                <div class="form-group row-2">
-                    <div>
-                        <label class="form-label">Hidden Secrets</label>
-                        <div class="dynamic-list-container">
-                            <div class="dynamic-input-row">
-                                <input type="text" id="secretInput" class="form-control" placeholder="e.g., Is secretly afraid of dogs">
-                                <button type="button" class="btn-add-dynamic" onclick="addSecret()">Add</button>
+                <section class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-heading">
+                            <div class="form-section-number">1</div>
+                            <div class="form-section-text">
+                                <div class="form-section-title">Identity & System Data</div>
+                                <div class="form-section-desc">Name und Kurzbeschreibung</div>
                             </div>
-                            <div id="secretsListDisplay" class="secrets-list-display"></div>
+                        </div>
+                        <div class="form-section-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
                         </div>
                     </div>
+                    <div class="form-section-body">
+                        <div class="form-group">
+                            <label class="form-label" for="charStoryName">Character Name</label>
+                            <input type="text" id="charStoryName" class="form-control" placeholder="e.g., Konata Izumi" required oninput="updatePreview()">
+                        </div>
 
-                    <div>
-                        <label class="form-label">Search Tags / Categories</label>
-                        <div class="dynamic-list-container">
-                            <div class="dynamic-input-row">
-                                <input type="text" id="tagInput" class="form-control" placeholder="e.g., Anime">
-                                <button type="button" class="btn-add-dynamic" onclick="addTag()">Add</button>
+                        <div class="form-group">
+                            <label class="form-label" for="charShortDesc">Short Desc <span style="font-weight:400; color: var(--text-muted); text-transform:none;">(optional)</span></label>
+                            <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" oninput="updatePreview()">
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-heading">
+                            <div class="form-section-number">2</div>
+                            <div class="form-section-text">
+                                <div class="form-section-title">Character Properties</div>
+                                <div class="form-section-desc">Aussehen, Persönlichkeit, Einleitungen</div>
                             </div>
-                            <div id="tagsWrapper" class="tags-wrapper"></div>
+                        </div>
+                        <div class="form-section-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                         </div>
                     </div>
-                </div>
+                    <div class="form-section-body">
+                        <div class="form-group">
+                            <label class="form-label" for="charAppearance">Appearance</label>
+                            <textarea id="charAppearance" class="form-control" placeholder="Blue hair, ahoge, small stature, sleepy eyes..." oninput="updatePreview()"></textarea>
+                        </div>
 
-                <div class="section-subtitle">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
-                    5. Voice & Sound (Text-to-Speech)
-                </div>
+                        <div class="form-group">
+                            <label class="form-label" for="charPersonality">Personality</label>
+                            <textarea id="charPersonality" class="form-control" placeholder="Exzentrisch, sarkastisch, freundlich, extrem leidenschaftlich bezüglich Videospielen und Animes..." oninput="updatePreview()"></textarea>
+                        </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="charVoiceLanguage">Voice Language</label>
-                    <select id="charVoiceLanguage" class="form-control" onchange="onVoiceLanguageChange()">
-                        <option value="">🌐 All languages</option>
-                    </select>
-                    <p class="voice-hint" style="margin-top:6px;">Filter the voice list below by language — your browser may offer voices for many languages, not only German.</p>
-                </div>
+                        <div class="form-group">
+                            <label class="form-label">Introductions</label>
+                            <div class="dynamic-list-container">
+                                <div class="dynamic-input-row">
+                                    <input type="text" id="introInput" class="form-control" placeholder="e.g., 'I have always observed the stars...'">
+                                    <button type="button" class="btn-add-dynamic" onclick="addIntroduction()">Add</button>
+                                </div>
+                                <div id="introductionsListDisplay" class="secrets-list-display"></div>
+                                <div id="introductionHelp" style="font-size:0.85rem; color:var(--text-muted); margin-top:8px;">
+                                    At least 1 introduction. Maximum 10 introductions.
+                                </div>
+                            </div>
+                        </div>
 
-                <div class="form-group">
-                    <label class="form-label" for="charVoiceSelect">Character Voice</label>
-                    <select id="charVoiceSelect" class="form-control" onchange="updatePreview()">
-                        <option value="">Standardstimme des Browsers</option>
-                    </select>
-                    <p class="voice-hint" style="margin-top:6px;">Nutzt die im Browser eingebaute Sprachausgabe (Web Speech API) — kein Download nötig. Verfügbare Stimmen hängen vom Gerät/Browser des Spielers ab.</p>
-                </div>
-
-                <div class="form-group row-2">
-                    <div>
-                        <label class="form-label" for="charVoicePitch">Tonhöhe (<span id="pitchValue">1.0</span>)</label>
-                        <input type="range" id="charVoicePitch" class="form-control" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('pitchValue').innerText = parseFloat(this.value).toFixed(1)">
+                        <div class="form-group">
+                            <label class="form-label" for="charGenerally">Generally</label>
+                            <textarea id="charGenerally" class="form-control" placeholder="Arbeitet in einem Cosplay-Café. Hasst es, für die Schule zu lernen und macht alles in der letzten Nacht..." oninput="updatePreview()"></textarea>
+                        </div>
                     </div>
-                    <div>
-                        <label class="form-label" for="charVoiceRate">Sprechgeschwindigkeit (<span id="rateValue">1.0</span>)</label>
-                        <input type="range" id="charVoiceRate" class="form-control" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('rateValue').innerText = parseFloat(this.value).toFixed(1)">
-                    </div>
-                </div>
+                </section>
 
-                <div class="form-group voice-test-row">
-                    <button type="button" class="btn-add-dynamic" onclick="testCharacterVoice()">🔊 Stimme testen</button>
-                </div>
+                <section class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-heading">
+                            <div class="form-section-number">3</div>
+                            <div class="form-section-text">
+                                <div class="form-section-title">Visual Assets & Cosmetics</div>
+                                <div class="form-section-desc">Avatar, Banner, Theme Color</div>
+                            </div>
+                        </div>
+                        <div class="form-section-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                        </div>
+                    </div>
+                    <div class="form-section-body">
+                        <div class="form-group row-2">
+                            <div>
+                                <label class="form-label" for="charAvatar">Avatar Image URL</label>
+                                <input type="url" id="charAvatar" class="form-control" placeholder="https://images.unsplash.com/..." oninput="updatePreview()">
+                            </div>
+                            <div>
+                                <label class="form-label" for="charCoverUrl">Banner Cover URL</label>
+                                <input type="url" id="charCoverUrl" class="form-control" placeholder="Optionales Hintergrundbild..." oninput="updatePreview()">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="charCoverBlur">Banner Background Blur (<span id="coverBlurValue">15</span>%)</label>
+                            <input type="range" id="charCoverBlur" class="form-control" min="0" max="60" step="1" value="15" oninput="document.getElementById('coverBlurValue').innerText = this.value">
+                            <p class="voice-hint" style="margin-top:6px;">Wird in GameCharacter.html als Blur-Stärke für das Banner-Hintergrundbild genutzt.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="charColor">Hex Theme Color Accent</label>
+                            <input type="color" id="charColor" class="form-control" value="#6366f1" oninput="updatePreview()">
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-heading">
+                            <div class="form-section-number">4</div>
+                            <div class="form-section-text">
+                                <div class="form-section-title">Relational Metadata</div>
+                                <div class="form-section-desc">Tags, Kategorien, Secrets</div>
+                            </div>
+                        </div>
+                        <div class="form-section-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM8.9 6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H8.9V6zM18 20H6V10h12v10z"/></svg>
+                        </div>
+                    </div>
+                    <div class="form-section-body">
+                        <div class="form-group row-2">
+                            <div>
+                                <label class="form-label">Hidden Secrets</label>
+                                <div class="dynamic-list-container">
+                                    <div class="dynamic-input-row">
+                                        <input type="text" id="secretInput" class="form-control" placeholder="e.g., Is secretly afraid of dogs">
+                                        <button type="button" class="btn-add-dynamic" onclick="addSecret()">Add</button>
+                                    </div>
+                                    <div id="secretsListDisplay" class="secrets-list-display"></div>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label class="form-label">Search Tags / Categories</label>
+                                <div class="dynamic-list-container">
+                                    <div class="dynamic-input-row">
+                                        <input type="text" id="tagInput" class="form-control" placeholder="e.g., Anime">
+                                        <button type="button" class="btn-add-dynamic" onclick="addTag()">Add</button>
+                                    </div>
+                                    <div id="tagsWrapper" class="tags-wrapper"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section class="form-section">
+                    <div class="form-section-header">
+                        <div class="form-section-heading">
+                            <div class="form-section-number">5</div>
+                            <div class="form-section-text">
+                                <div class="form-section-title">Voice & Sound (Text-to-Speech)</div>
+                                <div class="form-section-desc">Stimme, Tonhöhe, Sprechtempo</div>
+                            </div>
+                        </div>
+                        <div class="form-section-icon">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                        </div>
+                    </div>
+                    <div class="form-section-body">
+                        <div class="form-group">
+                            <label class="form-label" for="charVoiceLanguage">Voice Language</label>
+                            <select id="charVoiceLanguage" class="form-control" onchange="onVoiceLanguageChange()">
+                                <option value="">🌐 All languages</option>
+                            </select>
+                            <p class="voice-hint" style="margin-top:6px;">Filter the voice list below by language — your browser may offer voices for many languages, not only German.</p>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="charVoiceSelect">Character Voice</label>
+                            <select id="charVoiceSelect" class="form-control" onchange="updatePreview()">
+                                <option value="">Standardstimme des Browsers</option>
+                            </select>
+                            <p class="voice-hint" style="margin-top:6px;">Nutzt die im Browser eingebaute Sprachausgabe (Web Speech API) — kein Download nötig. Verfügbare Stimmen hängen vom Gerät/Browser des Spielers ab.</p>
+                        </div>
+
+                        <div class="form-group row-2">
+                            <div>
+                                <label class="form-label" for="charVoicePitch">Tonhöhe (<span id="pitchValue">1.0</span>)</label>
+                                <input type="range" id="charVoicePitch" class="form-control" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('pitchValue').innerText = parseFloat(this.value).toFixed(1)">
+                            </div>
+                            <div>
+                                <label class="form-label" for="charVoiceRate">Sprechgeschwindigkeit (<span id="rateValue">1.0</span>)</label>
+                                <input type="range" id="charVoiceRate" class="form-control" min="0.5" max="2" step="0.1" value="1" oninput="document.getElementById('rateValue').innerText = parseFloat(this.value).toFixed(1)">
+                            </div>
+                        </div>
+
+                        <div class="form-group voice-test-row">
+                            <button type="button" class="btn-add-dynamic" onclick="testCharacterVoice()">🔊 Stimme testen</button>
+                        </div>
+                    </div>
+                </section>
 
                 <button type="submit" class="create-submit-btn">
                     <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -1129,6 +1296,13 @@
             document.getElementById('charGenerally').value = item.generally || '';
             document.getElementById('charAvatar').value = item.avatar || item.coverURL || '';
             document.getElementById('charCoverUrl').value = item.backgroundURL || '';
+            const blurPx = (typeof item.backgroundBlurPx === 'number' && Number.isFinite(item.backgroundBlurPx))
+                ? item.backgroundBlurPx
+                : ((typeof item.backgroundBlur === 'number' && Number.isFinite(item.backgroundBlur)) ? item.backgroundBlur : 15);
+            const coverBlurInput = document.getElementById('charCoverBlur');
+            if (coverBlurInput) coverBlurInput.value = String(Math.min(60, Math.max(0, Math.round(blurPx))));
+            const coverBlurValue = document.getElementById('coverBlurValue');
+            if (coverBlurValue) coverBlurValue.innerText = String(Math.min(60, Math.max(0, Math.round(blurPx))));
             document.getElementById('charColor').value = item.color || '#6366f1';
             currentTags = Array.isArray(item.tags) ? [...item.tags] : [];
             currentSecrets = Array.isArray(item.secrets) ? [...item.secrets] : [];
@@ -1409,6 +1583,8 @@
             const generally = document.getElementById('charGenerally').value;
             const avatarUrl = document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80';
             const coverUrl = document.getElementById('charCoverUrl').value || '';
+            const coverBlurPercentRaw = parseFloat(document.getElementById('charCoverBlur')?.value);
+            const coverBlurPercent = Number.isFinite(coverBlurPercentRaw) ? Math.min(60, Math.max(0, Math.round(coverBlurPercentRaw))) : 15;
 
             if (currentIntroductions.length === 0) {
                 alert('Bitte füge mindestens eine Einleitung hinzu.');
@@ -1441,6 +1617,8 @@
                 avatar: avatarUrl,
                 coverURL: avatarUrl,
                 backgroundURL: coverUrl,
+                backgroundBlur: coverBlurPercent,
+                backgroundBlurPx: coverBlurPercent,
                 color: document.getElementById('charColor').value,
                 introductions: currentIntroductions,
                 secrets: currentSecrets,
