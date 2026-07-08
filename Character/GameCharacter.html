@@ -2160,6 +2160,21 @@
 
             if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
                 const indicesToRemove = new Set([msgIndex]);
+                const groupIdsToClear = new Set();
+
+                // Alle Reroll-Varianten einer Bot-Nachricht mitlöschen, nicht nur die
+                // gerade sichtbare Version - sonst "überlebt" die Nachricht einfach in
+                // einer anderen Version und taucht nach dem Löschen wieder auf.
+                const collectRerollSiblings = (msg) => {
+                    if (msg && msg.sender === 'bot' && msg.rerollGroupId) {
+                        groupIdsToClear.add(msg.rerollGroupId);
+                        chatHistory.forEach((m, idx) => {
+                            if (m.rerollGroupId === msg.rerollGroupId) indicesToRemove.add(idx);
+                        });
+                    }
+                };
+
+                collectRerollSiblings(targetMsg);
 
                 if (targetMsg.sender === 'bot') {
                     const previousMsg = chatHistory[msgIndex - 1];
@@ -2170,12 +2185,23 @@
                     const nextMsg = chatHistory[msgIndex + 1];
                     if (nextMsg && nextMsg.sender === 'bot') {
                         indicesToRemove.add(msgIndex + 1);
+                        collectRerollSiblings(nextMsg);
                     }
                 }
 
                 chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.has(idx));
 
+                // Verwaiste Seiten-/Versionszeiger für komplett gelöschte Reroll-Gruppen
+                // entfernen, damit sich in der Datenbank kein Datenmüll ansammelt.
+                if (groupIdsToClear.size && window.groupDisplayVersion) {
+                    groupIdsToClear.forEach(gid => delete window.groupDisplayVersion[gid]);
+                    await saveGroupDisplayVersions();
+                }
+
                 refreshRerollGroups();
+                // Memory-Kontext neu aufbauen, damit gelöschte Nachrichten nicht mehr
+                // als "Erinnerung" in zukünftige AI-Prompts einfließen.
+                await syncMemoriesFromChatHistory();
                 await saveChatHistory();
                 renderChatLog();
             }
@@ -2321,9 +2347,15 @@
                 lastBot.versionCount = 1;
             }
 
-            const nextVersionNumber = (lastBot.versionNumber || 1) + 1;
-            const nextVersionCount = (lastBot.versionCount || 1) + 1;
-            setGroupDisplayVersion(groupId, lastBot.versionNumber || 1);
+            // Die neue Versionsnummer basiert auf der höchsten bereits existierenden
+            // Version in dieser Gruppe (nicht auf der aktuell angezeigten Seite!).
+            // Das verhindert Kollisionen, falls man z.B. auf Seite 1/3 zurücknavigiert
+            // und dort erneut rerollt.
+            const existingVersions = chatHistory.filter(m => m.rerollGroupId === groupId);
+            const existingVersionNumbers = existingVersions.map(m => m.versionNumber || 1);
+            const highestVersionNumber = Math.max(lastBot.versionNumber || 1, ...existingVersionNumbers);
+            const nextVersionNumber = highestVersionNumber + 1;
+            const nextVersionCount = existingVersions.length + 1;
 
             const pendingMessage = {
                 ...lastBot,
@@ -2341,6 +2373,11 @@
             };
 
             chatHistory.push(pendingMessage);
+            refreshRerollGroups();
+            // Sofort auf die neue Seite springen, damit man direkt den Ladezustand
+            // der neuen Version sieht, statt bis zum Ende der Generierung auf der
+            // alten Seite "hängen" zu bleiben.
+            setGroupDisplayVersion(groupId, nextVersionNumber);
             saveChatHistory();
             renderChatLog();
             setLoadingState(true);
