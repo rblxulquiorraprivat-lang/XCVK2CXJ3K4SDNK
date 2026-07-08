@@ -499,6 +499,43 @@
             color: var(--text-main);
         }
 
+        .npc-info-search {
+            position: relative;
+            margin-bottom: 12px;
+        }
+
+        .npc-info-search svg {
+            position: absolute;
+            left: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 15px;
+            height: 15px;
+            fill: var(--text-muted);
+            pointer-events: none;
+        }
+
+        .npc-info-search input {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-size: 0.88rem;
+            padding: 9px 12px 9px 34px;
+            border-radius: 10px;
+            outline: none;
+            transition: var(--transition);
+        }
+
+        .npc-info-search input::placeholder {
+            color: var(--text-muted);
+        }
+
+        .npc-info-search input:focus {
+            border-color: var(--char-color, #6366f1);
+            background: rgba(255,255,255,0.06);
+        }
+
         .npc-info-list {
             display: flex;
             flex-direction: column;
@@ -520,6 +557,72 @@
             color: var(--text-muted);
             font-size: 0.78rem;
             margin-top: 4px;
+        }
+
+        .npc-info-item__footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .npc-info-item__actions {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .npc-info-action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 5px 9px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+        }
+
+        .npc-info-action-btn svg {
+            width: 12px;
+            height: 12px;
+            fill: currentColor;
+        }
+
+        .npc-info-action-btn:hover {
+            color: var(--text-main);
+            border-color: var(--char-color, #6366f1);
+            background: rgba(99, 102, 241, 0.12);
+        }
+
+        .npc-info-action-btn.npc-info-remove-btn:hover {
+            color: #ef4444;
+            border-color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+        }
+
+        .npc-info-empty {
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            padding: 14px 12px;
+        }
+
+        @keyframes npcJumpHighlight {
+            0% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.6); }
+            70% { box-shadow: 0 0 0 12px rgba(139, 92, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0); }
+        }
+
+        .msg-jump-highlight .msg-content {
+            animation: npcJumpHighlight 1.6s ease-out;
         }
 
         .modal-close-btn {
@@ -1201,10 +1304,18 @@
                 <div class="npc-info-modal__body">
                     <section class="npc-info-section">
                         <div class="npc-info-section__title">Memories</div>
+                        <div class="npc-info-search">
+                            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+                            <input type="text" id="npcMemoriesSearchInput" placeholder="Memories durchsuchen..." oninput="handleNpcMemoriesSearch(this.value)">
+                        </div>
                         <div class="npc-info-list" id="npcMemoriesList"></div>
                     </section>
                     <section class="npc-info-section">
                         <div class="npc-info-section__title">Favorite Messages</div>
+                        <div class="npc-info-search">
+                            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+                            <input type="text" id="npcFavoritesSearchInput" placeholder="Favoriten durchsuchen..." oninput="handleNpcFavoritesSearch(this.value)">
+                        </div>
                         <div class="npc-info-list" id="npcFavoriteMessagesList"></div>
                     </section>
                 </div>
@@ -1474,6 +1585,8 @@
         let isPersonaMenuOpen = false;
         let isWaitingForAI = false;
         let isNpcInfoModalOpen = false;
+        let npcMemoriesSearchQuery = '';
+        let npcFavoritesSearchQuery = '';
 
         function generateMessageId(index = 0) {
             return `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${index}`;
@@ -1561,7 +1674,7 @@
                 console.warn('Could not initialize Orama:', err);
                 oramaDB = null;
                 oramaInsert = async () => [];
-                oramaSearch = async () => [];
+                oramaSearch = async () => ({ hits: [] });
             }
         }
 
@@ -1653,7 +1766,7 @@
                 transformerPipeline = null;
                 oramaDB = null;
                 oramaInsert = async () => [];
-                oramaSearch = async () => [];
+                oramaSearch = async () => ({ hits: [] });
                 reportModelStatus('not-loaded');
             }
         }
@@ -2092,6 +2205,7 @@
                     id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
                     sender: msg.sender,
                     text: text,
+                    messageId: ensureMessageId(msg, index),
                     timestamp: msg.timestamp || Date.now() - ((visibleMessages.length - index) * 1000)
                 });
             });
@@ -2115,6 +2229,7 @@
                 id: `mem_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
                 sender: msg.sender,
                 text: String(msg.text).trim(),
+                messageId: ensureMessageId(msg),
                 timestamp: Date.now()
             });
             await saveMemories();
@@ -2146,8 +2261,86 @@
             backdrop.style.display = isNpcInfoModalOpen ? 'block' : 'none';
             modal.style.display = isNpcInfoModalOpen ? 'flex' : 'none';
             if (isNpcInfoModalOpen) {
+                // Start with a clean, unfiltered view every time the modal is opened.
+                npcMemoriesSearchQuery = '';
+                npcFavoritesSearchQuery = '';
+                const memoriesSearchInput = document.getElementById('npcMemoriesSearchInput');
+                const favoritesSearchInput = document.getElementById('npcFavoritesSearchInput');
+                if (memoriesSearchInput) memoriesSearchInput.value = '';
+                if (favoritesSearchInput) favoritesSearchInput.value = '';
                 renderNpcInfoModal();
             }
+        }
+
+        function handleNpcMemoriesSearch(value) {
+            npcMemoriesSearchQuery = String(value || '');
+            renderNpcInfoModal();
+        }
+
+        function handleNpcFavoritesSearch(value) {
+            npcFavoritesSearchQuery = String(value || '');
+            renderNpcInfoModal();
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        // Scrolls the chat log to a given message, switching to the correct
+        // reroll/version first if the message currently isn't the displayed
+        // version, and briefly highlights it. Used by the "jump" buttons in
+        // the NPC Memories & Favorites popup.
+        function jumpToChatMessage(messageId) {
+            if (!messageId) return;
+            const targetMsg = chatHistory.find(m => m && m.id === messageId);
+            if (!targetMsg) return;
+
+            closeNpcInfoModal();
+
+            if (targetMsg.rerollGroupId && getGroupDisplayVersion(targetMsg.rerollGroupId) !== targetMsg.versionNumber) {
+                setGroupDisplayVersion(targetMsg.rerollGroupId, targetMsg.versionNumber);
+                renderChatLog();
+            }
+
+            requestAnimationFrame(() => {
+                const target = Array.from(document.querySelectorAll('#storyLog [data-message-id]'))
+                    .find(el => el.dataset.messageId === messageId);
+                if (!target) return;
+                target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                target.classList.add('msg-jump-highlight');
+                setTimeout(() => target.classList.remove('msg-jump-highlight'), 1600);
+            });
+        }
+
+        // Older memories may not have a stored messageId yet (created before this
+        // field existed). Fall back to matching by sender + exact text so "jump"
+        // still works for them.
+        function resolveMemoryTargetMessageId(memory) {
+            if (!memory) return null;
+            if (memory.messageId && chatHistory.some(m => m && m.id === memory.messageId)) {
+                return memory.messageId;
+            }
+            const text = String(memory.text || '').trim().toLowerCase();
+            const sender = String(memory.sender || '').toLowerCase();
+            if (!text) return null;
+            const match = chatHistory.find(m =>
+                m && String(m.sender || '').toLowerCase() === sender &&
+                String(m.text || '').trim().toLowerCase() === text
+            );
+            return match ? match.id : null;
+        }
+
+        function jumpToMemory(memoryId) {
+            const memory = memories.find(m => m && m.id === memoryId);
+            if (!memory) return;
+            const targetMessageId = resolveMemoryTargetMessageId(memory);
+            if (!targetMessageId) return;
+            jumpToChatMessage(targetMessageId);
         }
 
         function closeNpcInfoModal() {
@@ -2159,29 +2352,59 @@
             modal.style.display = 'none';
         }
 
+        const NPC_INFO_JUMP_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>';
+        const NPC_INFO_REMOVE_ICON = '<svg viewBox="0 0 24 24"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
+
         function renderNpcInfoModal() {
             const memoriesList = document.getElementById('npcMemoriesList');
             const favoritesList = document.getElementById('npcFavoriteMessagesList');
             if (!memoriesList || !favoritesList) return;
 
-            memoriesList.innerHTML = memories.length
-                ? memories.map(memory => `
-                    <div class="npc-info-item">
-                        ${String(memory.text || '').trim()}
-                        <small>${memory.sender === 'user' ? 'User' : (currentCharacter?.name || 'NPC')}</small>
-                    </div>
-                `).join('')
-                : '<div class="npc-info-item">Noch keine Memories gespeichert.</div>';
+            const memoryQuery = npcMemoriesSearchQuery.trim().toLowerCase();
+            const filteredMemories = memoryQuery
+                ? memories.filter(memory => String(memory?.text || '').toLowerCase().includes(memoryQuery))
+                : memories;
 
-            const favoriteEntries = getFavoriteMessageEntries();
-            favoritesList.innerHTML = favoriteEntries.length
-                ? favoriteEntries.map(message => `
+            memoriesList.innerHTML = filteredMemories.length
+                ? filteredMemories.map(memory => `
                     <div class="npc-info-item">
-                        ${String(message.text || '').trim()}
-                        <small>${message.sender === 'user' ? 'User' : (message.characterName || currentCharacter?.name || 'NPC')}</small>
+                        <div class="npc-info-item__text">${escapeHtml(String(memory.text || '').trim())}</div>
+                        <div class="npc-info-item__footer">
+                            <small>${memory.sender === 'user' ? 'User' : (currentCharacter?.name || 'NPC')}</small>
+                            <div class="npc-info-item__actions">
+                                <button type="button" class="npc-info-action-btn" title="Zur Nachricht springen" onclick="jumpToMemory('${memory.id}')">
+                                    ${NPC_INFO_JUMP_ICON} Springen
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 `).join('')
-                : '<div class="npc-info-item">Noch keine Favoriten markiert.</div>';
+                : `<div class="npc-info-empty">${memoryQuery ? 'Keine Memories gefunden.' : 'Noch keine Memories gespeichert.'}</div>`;
+
+            const favoriteQuery = npcFavoritesSearchQuery.trim().toLowerCase();
+            const favoriteEntries = getFavoriteMessageEntries();
+            const filteredFavorites = favoriteQuery
+                ? favoriteEntries.filter(message => String(message?.text || '').toLowerCase().includes(favoriteQuery))
+                : favoriteEntries;
+
+            favoritesList.innerHTML = filteredFavorites.length
+                ? filteredFavorites.map(message => `
+                    <div class="npc-info-item">
+                        <div class="npc-info-item__text">${escapeHtml(String(message.text || '').trim())}</div>
+                        <div class="npc-info-item__footer">
+                            <small>${message.sender === 'user' ? 'User' : (message.characterName || currentCharacter?.name || 'NPC')}</small>
+                            <div class="npc-info-item__actions">
+                                <button type="button" class="npc-info-action-btn" title="Zur Nachricht springen" onclick="jumpToChatMessage('${message.id}')">
+                                    ${NPC_INFO_JUMP_ICON} Springen
+                                </button>
+                                <button type="button" class="npc-info-action-btn npc-info-remove-btn" title="Favorit entfernen" onclick="toggleFavoriteMessage('${message.id}')">
+                                    ${NPC_INFO_REMOVE_ICON} Entfernen
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('')
+                : `<div class="npc-info-empty">${favoriteQuery ? 'Keine Favoriten gefunden.' : 'Noch keine Favoriten markiert.'}</div>`;
         }
 
         function getRelevantMemories(historyMessages = null) {
@@ -2771,7 +2994,7 @@
                     : (msg.characterName || effectiveName || msg.name || currentCharacter.name);
                 
                 return `
-                    <div class="msg-wrapper ${isUser ? 'user-msg-wrapper' : 'bot-msg-wrapper'}">
+                    <div class="msg-wrapper ${isUser ? 'user-msg-wrapper' : 'bot-msg-wrapper'}" data-message-id="${msg.id || ''}">
                         <div class="msg-bubble-avatar" style="background-image: url('${isUser ? 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&q=80' : msg.avatar}')"></div>
                         <div class="msg-bubble-body">
                             <div class="msg-header-row">
@@ -2811,7 +3034,7 @@
             );
 
             try {
-                const searchResults = await oramaSearch(oramaDB, { term: lastUserText, limit: 3, tolerance: 1 });
+                const searchResults = await oramaSearch(oramaDB, { term: lastUserText, properties: ['content'], limit: 3, tolerance: 1 });
                 const hits = Array.isArray(searchResults?.hits) ? searchResults.hits : [];
 
                 if (hits.length > 0) {
@@ -2966,7 +3189,7 @@
                 let instruction = buildAIPrompt();
                 if (typeof oramaSearch === 'function' && oramaDB) {
                     try {
-                        const searchResults = await oramaSearch(oramaDB, { term: text, limit: 3, tolerance: 1 });
+                        const searchResults = await oramaSearch(oramaDB, { term: text, properties: ['content'], limit: 3, tolerance: 1 });
                         const hits = Array.isArray(searchResults?.hits) ? searchResults.hits : [];
                         if (hits.length > 0) {
                             let memoryContext = '\n[Wichtige Erinnerungen an frühere Ereignisse im Chat]:\n';
