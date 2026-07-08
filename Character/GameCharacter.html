@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Immersive Chat</title>
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
     <script>
         const BRIDGE_MESSAGE_TIMEOUT_MS = 20000;
 
@@ -1191,6 +1192,18 @@
         const GROUP_DISPLAY_VERSION_KEY_PREFIX = 'storyAI_versions_';
         const DRAFT_KEY_PREFIX = 'storyAI_draft_';
 
+        const db = new Dexie('StoryAIDatabase');
+        db.version(1).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId'
+        });
+
         // Orama (dynamic) memory DB handles - will be initialized at runtime
         let oramaDB = null;
         let oramaInsert = null;
@@ -1234,26 +1247,26 @@
 
         function getGroupDisplayVersionKey(characterId = null) {
             const id = characterId !== null && characterId !== undefined ? characterId : currentCharacter?.id;
-            return id !== null && id !== undefined ? GROUP_DISPLAY_VERSION_KEY_PREFIX + id : null;
+            return id !== null && id !== undefined ? parseInt(id, 10) : null;
         }
 
-        function loadGroupDisplayVersions(characterId = null) {
+        async function loadGroupDisplayVersions(characterId = null) {
             try {
-                const key = getGroupDisplayVersionKey(characterId);
-                if (!key) return {};
-                const raw = localStorage.getItem(key);
-                return raw ? JSON.parse(raw) : {};
+                const id = getGroupDisplayVersionKey(characterId);
+                if (id === null) return {};
+                const row = await db.table('displayVersions').get(id);
+                return row?.value ?? {};
             } catch (err) {
                 console.warn('Error loading group display versions:', err);
                 return {};
             }
         }
 
-        function saveGroupDisplayVersions() {
+        async function saveGroupDisplayVersions() {
             try {
-                const key = getGroupDisplayVersionKey();
-                if (!key) return;
-                localStorage.setItem(key, JSON.stringify(window.groupDisplayVersion || {}));
+                const id = getGroupDisplayVersionKey();
+                if (id === null) return;
+                await db.table('displayVersions').put({ characterId: id, value: window.groupDisplayVersion || {} });
             } catch (err) {
                 console.warn('Error saving group display versions:', err);
             }
@@ -1276,13 +1289,12 @@
                 const existingMessages = Array.isArray(chatHistory) ? chatHistory : [];
                 const fallbackHistory = existingMessages.length
                     ? existingMessages
-                    : (() => {
+                    : await (async () => {
                         try {
-                            const urlParams = new URLSearchParams(window.location.search);
-                            const urlCharId = parseInt(urlParams.get('id'));
-                            const charId = currentCharacter?.id ?? urlCharId;
-                            const saved = localStorage.getItem(CHAT_HISTORY_PREFIX + charId);
-                            return saved ? JSON.parse(saved) : [];
+                            const id = parseInt(currentCharacter?.id ?? new URLSearchParams(window.location.search).get('id'), 10);
+                            if (!Number.isFinite(id)) return [];
+                            const row = await db.table('chatHistory').get(id);
+                            return row && Array.isArray(row.history) ? row.history : [];
                         } catch (err) {
                             return [];
                         }
@@ -1305,66 +1317,76 @@
 
         function getDraftKey(characterId = null) {
             const id = characterId !== null && characterId !== undefined ? characterId : currentCharacter?.id;
-            return id !== null && id !== undefined ? DRAFT_KEY_PREFIX + id : null;
+            return id !== null && id !== undefined ? parseInt(id, 10) : null;
         }
 
-        function loadDraft(characterId = null) {
+        async function loadDraft(characterId = null) {
             try {
-                const key = getDraftKey(characterId);
-                if (!key) return '';
-                return localStorage.getItem(key) || '';
+                const id = getDraftKey(characterId);
+                if (id === null) return '';
+                const row = await db.table('drafts').get(id);
+                return row?.text ?? '';
             } catch (err) {
                 console.warn('Error loading draft:', err);
                 return '';
             }
         }
 
-        function saveDraft(text) {
+        async function saveDraft(text) {
             try {
-                const key = getDraftKey();
-                if (!key) return;
-                localStorage.setItem(key, text);
+                const id = getDraftKey();
+                if (id === null) return;
+                await db.table('drafts').put({ characterId: id, text });
             } catch (err) {
                 console.warn('Error saving draft:', err);
             }
         }
 
-        function removeDraft(characterId = null) {
+        async function removeDraft(characterId = null) {
             try {
-                const key = getDraftKey(characterId);
-                if (!key) return;
-                localStorage.removeItem(key);
+                const id = getDraftKey(characterId);
+                if (id === null) return;
+                await db.table('drafts').delete(id);
             } catch (err) {
                 console.warn('Error removing draft:', err);
             }
         }
 
-        function loadStoryPersonaId(characterId = null) {
+        function getStoryPersonaSettingId(characterId = null) {
+            const id = characterId !== null && characterId !== undefined ? characterId : currentCharacter?.id;
+            return id !== null && id !== undefined ? parseInt(id, 10) : null;
+        }
+
+        async function loadStoryPersonaId(characterId = null) {
             try {
-                const key = getStoryPersonaKey(characterId);
-                if (!key) return null;
-                const raw = localStorage.getItem(key);
-                return raw ? parseInt(raw, 10) : null;
+                const id = getStoryPersonaSettingId(characterId);
+                if (id === null) return null;
+                const row = await db.table('settings').get(`storyPersona_${id}`);
+                return row?.value ?? null;
             } catch (err) {
                 console.warn('Error loading story persona:', err);
                 return null;
             }
         }
 
-        function saveStoryPersonaId(id) {
-            const key = getStoryPersonaKey();
-            if (!key) return;
-            if (id === null || id === undefined) {
-                localStorage.removeItem(key);
-            } else {
-                localStorage.setItem(key, id.toString());
+        async function saveStoryPersonaId(id) {
+            try {
+                const charId = getStoryPersonaSettingId();
+                if (charId === null) return;
+                if (id === null || id === undefined) {
+                    await db.table('settings').delete(`storyPersona_${charId}`);
+                } else {
+                    await db.table('settings').put({ id: `storyPersona_${charId}`, value: id });
+                }
+            } catch (err) {
+                console.warn('Error saving story persona:', err);
             }
         }
 
-        function loadSelectedPersonaId() {
+        async function loadSelectedPersonaId() {
             try {
-                const raw = localStorage.getItem(SELECTED_PERSONA_KEY);
-                return raw ? parseInt(raw, 10) : null;
+                const row = await db.table('settings').get('selectedPersonaId');
+                return row?.value ?? null;
             } catch (err) {
                 console.warn('Error loading default persona:', err);
                 return null;
@@ -1377,9 +1399,10 @@
             model: 'StoryAI Ultra v2.5'
         };
 
-        function loadStoredSettings() {
+        async function loadStoredSettings() {
             try {
-                return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || {};
+                const row = await db.table('settings').get(1);
+                return row?.value ?? {};
             } catch (err) {
                 console.warn('Error loading saved settings:', err);
                 return {};
@@ -1388,16 +1411,16 @@
 
         async function initChatPage() {
             await initOrama();
-            settings = { ...settings, ...loadStoredSettings() };
+            settings = { ...settings, ...await loadStoredSettings() };
             const urlParams = new URLSearchParams(window.location.search);
-            const charId = parseInt(urlParams.get('id')); 
+            const charId = parseInt(urlParams.get('id'), 10);
 
-            let items = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-            personas = JSON.parse(localStorage.getItem(PERSONA_KEY) || '[]');
+            const items = await db.table('characters').toArray();
+            personas = await db.table('personas').toArray();
 
             currentCharacter = items.find(i => i.id === charId);
-            const storyPersonaId = loadStoryPersonaId(charId);
-            const defaultPersonaId = storyPersonaId !== null ? storyPersonaId : loadSelectedPersonaId();
+            const storyPersonaId = await loadStoryPersonaId(charId);
+            const defaultPersonaId = storyPersonaId !== null ? storyPersonaId : await loadSelectedPersonaId();
             selectedPersona = personas.find(p => p.id === defaultPersonaId) || null;
 
             if (!currentCharacter) {
@@ -1411,9 +1434,9 @@
             document.getElementById('ambientBg').style.backgroundImage = `url('${currentCharacter.avatar}')`;
             document.getElementById('topbarAvatar').style.backgroundImage = `url('${currentCharacter.avatar}')`;
             document.getElementById('topbarName').innerText = currentCharacter.name;
-            memories = loadMemories();
-            favoriteMessages = loadFavoriteMessages();
-            window.groupDisplayVersion = loadGroupDisplayVersions(charId);
+            memories = await loadMemories();
+            favoriteMessages = await loadFavoriteMessages();
+            window.groupDisplayVersion = await loadGroupDisplayVersions(charId);
 
             updatePersonaButton();
             renderPersonaMenu();
@@ -1434,14 +1457,14 @@
 
             const chatInput = document.getElementById('chatInput');
             if (chatInput) {
-                const draft = loadDraft(charId);
+                const draft = await loadDraft(charId);
                 if (draft) {
                     chatInput.value = draft;
                     autoGrowTextarea(chatInput);
                 }
             }
 
-            loadChatHistory();
+            await loadChatHistory();
         }
 
         function formatJanitorText(text) {
@@ -1455,57 +1478,68 @@
         }
 
         async function loadChatHistory() {
-            const savedHistory = localStorage.getItem(CHAT_HISTORY_PREFIX + currentCharacter.id);
-            if (savedHistory) {
-                chatHistory = JSON.parse(savedHistory);
-                if (currentCharacter && currentCharacter.characterName) {
-                    chatHistory = chatHistory.map(msg => {
-                        if (msg.sender === 'bot' && !msg.characterName) {
-                            return {
-                                ...msg,
-                                characterName: getCharacterName()
-                            };
-                        }
-                        return msg;
-                    });
+            try {
+                const row = await db.table('chatHistory').get(parseInt(currentCharacter.id, 10));
+                if (row && Array.isArray(row.history) && row.history.length) {
+                    chatHistory = row.history;
+                    if (currentCharacter && currentCharacter.characterName) {
+                        chatHistory = chatHistory.map(msg => {
+                            if (msg.sender === 'bot' && !msg.characterName) {
+                                return {
+                                    ...msg,
+                                    characterName: getCharacterName()
+                                };
+                            }
+                            return msg;
+                        });
+                    }
+                    syncMemoriesFromChatHistory();
+                    refreshRerollGroups();
+                    renderChatLog();
+                    return;
                 }
-                syncMemoriesFromChatHistory();
-                refreshRerollGroups();
-                renderChatLog();
-            } else {
-                await initializeIntroductoryChat();
+            } catch (err) {
+                console.warn('Error loading chat history:', err);
+            }
+
+            await initializeIntroductoryChat();
+        }
+
+        async function saveChatHistory() {
+            normalizeChatHistoryIds();
+            try {
+                await db.table('chatHistory').put({ characterId: parseInt(currentCharacter.id, 10), history: chatHistory });
+            } catch (err) {
+                console.warn('Error saving chat history:', err);
             }
         }
 
-        function saveChatHistory() {
-            normalizeChatHistoryIds();
-            localStorage.setItem(CHAT_HISTORY_PREFIX + currentCharacter.id, JSON.stringify(chatHistory));
-        }
-
-        function getMemoryStorageKey() {
+        function getMemoryStorageId() {
             return currentCharacter?.id !== null && currentCharacter?.id !== undefined
-                ? MEMORY_KEY_PREFIX + currentCharacter.id
+                ? parseInt(currentCharacter.id, 10)
                 : null;
         }
 
-        function loadMemories() {
+        async function loadMemories() {
             try {
-                const key = getMemoryStorageKey();
-                if (!key) return [];
-                const raw = localStorage.getItem(key);
-                if (!raw) return [];
-                const parsed = JSON.parse(raw);
-                return Array.isArray(parsed) ? parsed : [];
+                const id = getMemoryStorageId();
+                if (id === null) return [];
+                const row = await db.table('memories').get(id);
+                return Array.isArray(row?.value) ? row.value : [];
             } catch (err) {
                 console.warn('Error loading memories:', err);
                 return [];
             }
         }
 
-        function saveMemories() {
-            const key = getMemoryStorageKey();
-            if (!key) return;
-            localStorage.setItem(key, JSON.stringify(memories));
+        async function saveMemories() {
+            try {
+                const id = getMemoryStorageId();
+                if (id === null) return;
+                await db.table('memories').put({ characterId: id, value: memories });
+            } catch (err) {
+                console.warn('Error saving memories:', err);
+            }
         }
 
         function getFavoriteMessagesKey() {
@@ -1514,26 +1548,29 @@
                 : null;
         }
 
-        function loadFavoriteMessages() {
+        async function loadFavoriteMessages() {
             try {
-                const key = getFavoriteMessagesKey();
-                if (!key) return [];
-                const raw = localStorage.getItem(key);
-                const parsed = raw ? JSON.parse(raw) : [];
-                return Array.isArray(parsed) ? parsed : [];
+                const id = currentCharacter?.id !== null && currentCharacter?.id !== undefined ? parseInt(currentCharacter.id, 10) : null;
+                if (id === null) return [];
+                const row = await db.table('favorites').get(id);
+                return Array.isArray(row?.value) ? row.value : [];
             } catch (err) {
                 console.warn('Error loading favorite messages:', err);
                 return [];
             }
         }
 
-        function saveFavoriteMessages() {
-            const key = getFavoriteMessagesKey();
-            if (!key) return;
-            localStorage.setItem(key, JSON.stringify(favoriteMessages));
+        async function saveFavoriteMessages() {
+            try {
+                const id = currentCharacter?.id !== null && currentCharacter?.id !== undefined ? parseInt(currentCharacter.id, 10) : null;
+                if (id === null) return;
+                await db.table('favorites').put({ characterId: id, value: favoriteMessages });
+            } catch (err) {
+                console.warn('Error saving favorite messages:', err);
+            }
         }
 
-        function toggleFavoriteMessage(messageId) {
+        async function toggleFavoriteMessage(messageId) {
             if (!messageId) return;
             const exists = favoriteMessages.includes(messageId);
             if (exists) {
@@ -1541,12 +1578,12 @@
             } else {
                 favoriteMessages.push(messageId);
             }
-            saveFavoriteMessages();
+            await saveFavoriteMessages();
             renderChatLog();
             renderNpcInfoModal();
         }
 
-        function syncMemoriesFromChatHistory() {
+        async function syncMemoriesFromChatHistory() {
             if (!currentCharacter) return;
 
             memories = [];
@@ -1569,10 +1606,10 @@
                 });
             });
 
-            saveMemories();
+            await saveMemories();
         }
 
-        function storeMessageAsMemory(msg) {
+        async function storeMessageAsMemory(msg) {
             if (!msg || msg.isLoading || !msg.text || !String(msg.text).trim()) return;
 
             const normalizedText = String(msg.text).trim().toLowerCase();
@@ -1590,7 +1627,7 @@
                 text: String(msg.text).trim(),
                 timestamp: Date.now()
             });
-            saveMemories();
+            await saveMemories();
         }
 
         function getFavoriteMessageContext(historyMessages = null) {
@@ -1731,8 +1768,10 @@
             }));
             refreshRerollGroups();
             setGroupDisplayVersion(groupId, 1);
-            chatHistory.forEach(msg => storeMessageAsMemory(msg));
-            saveChatHistory();
+            for (const msg of chatHistory) {
+                await storeMessageAsMemory(msg);
+            }
+            await saveChatHistory();
             renderChatLog();
         }
 
@@ -1784,7 +1823,7 @@
             return msg.versionNumber === getGroupDisplayVersion(msg.rerollGroupId);
         }
 
-        function deleteMessagePair(msgIndex) {
+        async function deleteMessagePair(msgIndex) {
             if (isWaitingForAI) return;
 
             const targetMsg = chatHistory[msgIndex];
@@ -1814,7 +1853,7 @@
                 chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.has(idx));
 
                 refreshRerollGroups();
-                saveChatHistory();
+                await saveChatHistory();
                 renderChatLog();
             }
         }
@@ -2278,7 +2317,7 @@
             }
         }
 
-        function addPendingBotMessage() {
+        async function addPendingBotMessage() {
             const effectiveName = getCharacterName();
             const pendingMsg = {
                 sender: 'bot',
@@ -2292,12 +2331,12 @@
                 isLoading: true
             };
             chatHistory.push(pendingMsg);
-            saveChatHistory();
+            await saveChatHistory();
             renderChatLog();
             return pendingMsg;
         }
 
-        function finalizePendingBotMessage(pendingMsg, text) {
+        async function finalizePendingBotMessage(pendingMsg, text) {
             const targetIndex = chatHistory.findIndex(msg => msg === pendingMsg);
             if (targetIndex === -1) return;
             chatHistory[targetIndex] = {
@@ -2305,8 +2344,8 @@
                 text: text.trim(),
                 isLoading: false
             };
-            storeMessageAsMemory(chatHistory[targetIndex]);
-            saveChatHistory();
+            await storeMessageAsMemory(chatHistory[targetIndex]);
+            await saveChatHistory();
             renderChatLog();
         }
 
@@ -2329,7 +2368,7 @@
                     isLoading: false,
                     isIntro: true
                 } : msg);
-                saveChatHistory();
+                await saveChatHistory();
                 renderChatLog();
             } catch (error) {
                 console.error("AI Error:", error);
@@ -2341,7 +2380,7 @@
                     isLoading: false,
                     isIntro: true
                 } : msg);
-                saveChatHistory();
+                await saveChatHistory();
                 renderChatLog();
             } finally {
                 setLoadingState(false);
@@ -2362,15 +2401,15 @@
             };
             ensureMessageId(userMessage, chatHistory.length);
             chatHistory.push(userMessage);
-            storeMessageAsMemory(userMessage);
+            await storeMessageAsMemory(userMessage);
 
-            removeDraft();
+            await removeDraft();
             inputEl.value = '';
             inputEl.style.height = '44px';
-            saveChatHistory();
+            await saveChatHistory();
             renderChatLog();
 
-            const pendingMsg = addPendingBotMessage();
+            const pendingMsg = await addPendingBotMessage();
             setLoadingState(true);
 
             try {
@@ -2448,7 +2487,11 @@
 
         async function clearSessionChat() {
             if (confirm("Do you want to reset all chat history with this character?")) {
-                localStorage.removeItem(CHAT_HISTORY_PREFIX + currentCharacter.id);
+                try {
+                    await db.table('chatHistory').delete(parseInt(currentCharacter.id, 10));
+                } catch (err) {
+                    console.warn('Error clearing chat history:', err);
+                }
                 chatHistory = [];
                 renderChatLog();
                 // Reinitialize Orama so the memory DB is reset as well

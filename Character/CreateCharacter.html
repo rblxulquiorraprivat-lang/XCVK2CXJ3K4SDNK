@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Create Character</title>
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -938,24 +939,45 @@
 
         const STORAGE_KEY = 'storyAI_items';
 
-        function loadStoredItems() {
+        const db = new Dexie('StoryAIDatabase');
+        db.version(1).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId'
+        });
+
+        async function loadStoredItems() {
             try {
-                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+                return await db.table('characters').toArray();
             } catch (err) {
                 console.warn('Error loading saved items:', err);
                 return [];
             }
         }
 
-        function saveStoredItems(items) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+        async function saveStoredItems(items) {
+            try {
+                await db.transaction('rw', db.characters, async () => {
+                    await db.characters.clear();
+                    if (Array.isArray(items)) {
+                        await db.characters.bulkPut(items);
+                    }
+                });
+            } catch (err) {
+                console.warn('Error saving stored items:', err);
+            }
         }
 
         // Process submit payload
-        function handleFormSubmit(e) {
+        async function handleFormSubmit(e) {
             e.preventDefault();
             
-            const savedItems = loadStoredItems();
+            const savedItems = await loadStoredItems();
             const shortDesc = document.getElementById('charShortDesc').value;
             const appearance = document.getElementById('charAppearance').value;
             const personality = document.getElementById('charPersonality').value;
@@ -994,24 +1016,17 @@
             };
 
             if (isEditing) {
-                const index = savedItems.findIndex(item => item.id === editId);
-                if (index > -1) {
-                    savedItems[index] = fullCharacterEntity;
-                } else {
-                    savedItems.push(fullCharacterEntity);
-                }
+                await db.table('characters').put(fullCharacterEntity);
             } else {
-                savedItems.push(fullCharacterEntity);
+                await db.table('characters').put(fullCharacterEntity);
             }
-
-            saveStoredItems(savedItems);
 
             console.log("Database Object Payload compiled:", fullCharacterEntity);
             alert(`🎉 Success! Character "${fullCharacterEntity.storyName}" was successfully ${isEditing ? 'updated' : 'created'}.\n\nRedirect you back to the Dashboard Hub...`);
             window.location.href = '../index.html';
         }
 
-        function initializeForm() {
+        async function initializeForm() {
             const editParam = getQueryParam('id');
             if (!editParam) {
                 currentTags = ['Otaku', 'Comedy'];
@@ -1036,7 +1051,7 @@
                 return;
             }
 
-            const savedItems = loadStoredItems();
+            const savedItems = await loadStoredItems();
             const storedItem = savedItems.find(item => item.id === editIdValue);
             if (storedItem) {
                 populateForm(storedItem);
@@ -1052,8 +1067,8 @@
         }
 
         // Initial start when loading
-        window.addEventListener('DOMContentLoaded', () => {
-            initializeForm();
+        window.addEventListener('DOMContentLoaded', async () => {
+            await initializeForm();
         });
     </script>
 </body>
