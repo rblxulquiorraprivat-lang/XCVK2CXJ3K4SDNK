@@ -1175,12 +1175,40 @@
             }
         });
 
+        window.addEventListener('pageshow', async () => {
+            try { settings = { ...settings, ...await loadStoredSettings() }; } catch (_) {}
+            try {
+                const storedStatus = localStorage.getItem(MODEL_STATUS_KEY);
+                if (storedStatus) modelStatus = storedStatus;
+            } catch (_) {}
+            renderMainArea();
+        });
+
         function setModelStatus(status) {
             modelStatus = status;
             try { localStorage.setItem(MODEL_STATUS_KEY, status); } catch (err) { /* ignore */ }
             try { modelStatusChannel?.postMessage({ status }); } catch (err) { /* ignore */ }
             renderMainArea();
         }
+
+        const MEMORY_SYSTEM_SYNC_KEY = 'storyai_memory_system';
+        let settingsSyncChannel = null;
+        try {
+            settingsSyncChannel = new BroadcastChannel('storyai-settings');
+            settingsSyncChannel.onmessage = (event) => {
+                const value = event?.data?.type === 'memorySystem' ? event.data.value : null;
+                if (!value) return;
+                setSetting('memorySystem', value);
+            };
+        } catch (err) {
+            console.warn('Settings BroadcastChannel not available, falling back to localStorage only:', err);
+        }
+
+        window.addEventListener('storage', (event) => {
+            if (event.key === MEMORY_SYSTEM_SYNC_KEY && event.newValue) {
+                setSetting('memorySystem', event.newValue);
+            }
+        });
 
         async function setMemorySystem(value) {
             await setSetting('memorySystem', value);
