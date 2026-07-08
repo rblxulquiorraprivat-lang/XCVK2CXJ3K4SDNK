@@ -1437,7 +1437,7 @@
                 <div class="npc-info-modal__header">
                     <div>
                         <div class="npc-info-modal__title" id="npcInfoTitle">NPC Memories & Favorites</div>
-                        <div class="npc-info-modal__subtitle">Gespeicherte Kontextinformationen für diesen Charakter</div>
+                        <div class="npc-info-modal__subtitle">Saved context information for this character</div>
                     </div>
                     <button type="button" class="modal-close-btn" onclick="closeNpcInfoModal()" title="Schließen">
                         <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
@@ -1448,7 +1448,7 @@
                         <div class="npc-info-section__title">Memories</div>
                         <div class="npc-info-search">
                             <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-                            <input type="text" id="npcMemoriesSearchInput" placeholder="Memories durchsuchen..." oninput="handleNpcMemoriesSearch(this.value)">
+                            <input type="text" id="npcMemoriesSearchInput" placeholder="Find memories..." oninput="handleNpcMemoriesSearch(this.value)">
                         </div>
                         <div class="npc-info-list" id="npcMemoriesList"></div>
                     </section>
@@ -1456,7 +1456,7 @@
                         <div class="npc-info-section__title">Favorite Messages</div>
                         <div class="npc-info-search">
                             <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-                            <input type="text" id="npcFavoritesSearchInput" placeholder="Favoriten durchsuchen..." oninput="handleNpcFavoritesSearch(this.value)">
+                            <input type="text" id="npcFavoritesSearchInput" placeholder="Find favorite messages..." oninput="handleNpcFavoritesSearch(this.value)">
                         </div>
                         <div class="npc-info-list" id="npcFavoriteMessagesList"></div>
                     </section>
@@ -1467,18 +1467,18 @@
             <div class="edit-msg-modal" id="editMsgModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="editMsgTitle">
                 <div class="edit-msg-modal__header">
                     <div>
-                        <div class="edit-msg-modal__title" id="editMsgTitle">AI Nachricht bearbeiten</div>
-                        <div class="edit-msg-modal__subtitle">Währenddessen sind Senden/Löschen/Reroll/Continue/Zurück gesperrt.</div>
+                        <div class="edit-msg-modal__title" id="editMsgTitle">AI edit message</div>
+                        <div class="edit-msg-modal__subtitle">Edit this message</div>
                     </div>
                     <button type="button" class="modal-close-btn" onclick="closeEditMessageModal()" title="Schließen">
                         <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
                     </button>
                 </div>
                 <div class="edit-msg-modal__body">
-                    <textarea id="editMsgTextarea" class="edit-msg-textarea" placeholder="AI Nachricht..."></textarea>
+                    <textarea id="editMsgTextarea" class="edit-msg-textarea" placeholder="AI message..."></textarea>
                     <div class="edit-msg-actions">
-                        <button type="button" class="edit-msg-btn" onclick="closeEditMessageModal()">Abbrechen</button>
-                        <button type="button" class="edit-msg-btn edit-msg-btn-primary" id="editMsgSaveBtn" onclick="saveEditMessageModal()">Speichern</button>
+                        <button type="button" class="edit-msg-btn" onclick="closeEditMessageModal()">Cancel</button>
+                        <button type="button" class="edit-msg-btn edit-msg-btn-primary" id="editMsgSaveBtn" onclick="saveEditMessageModal()">Save</button>
                     </div>
                 </div>
             </div>
@@ -1491,7 +1491,7 @@
                     <div class="persona-switcher">
                         <button type="button" class="persona-selector-btn" id="personaSelectBtn" onclick="togglePersonaMenu(event)">Persona</button>
                         <div class="persona-menu" id="personaMenu" style="display: none;">
-                            <input id="personaSearchInput" class="persona-search-input" placeholder="Suche Personas..." oninput="updatePersonaSearch(event)">
+                            <input id="personaSearchInput" class="persona-search-input" placeholder="Find personas..." oninput="updatePersonaSearch(event)">
                             <div class="persona-list" id="personaList"></div>
                         </div>
                     </div>
@@ -2599,14 +2599,14 @@
                         <div class="npc-info-item__footer">
                             <small>${memory.sender === 'user' ? 'User' : (currentCharacter?.name || 'NPC')}</small>
                             <div class="npc-info-item__actions">
-                                <button type="button" class="npc-info-action-btn" title="Zur Nachricht springen" onclick="jumpToMemory('${memory.id}')">
-                                    ${NPC_INFO_JUMP_ICON} Springen
+                                <button type="button" class="npc-info-action-btn" title="Jump to message" onclick="jumpToMemory('${memory.id}')">
+                                    ${NPC_INFO_JUMP_ICON} Jump
                                 </button>
                             </div>
                         </div>
                     </div>
                 `).join('')
-                : `<div class="npc-info-empty">${memoryQuery ? 'Keine Memories gefunden.' : 'Noch keine Memories gespeichert.'}</div>`;
+                : `<div class="npc-info-empty">${memoryQuery ? 'No memories found.' : 'No memories saved yet.'}</div>`;
 
             const favoriteQuery = npcFavoritesSearchQuery.trim().toLowerCase();
             const favoriteEntries = getFavoriteMessageEntries();
@@ -2621,17 +2621,17 @@
                         <div class="npc-info-item__footer">
                             <small>${message.sender === 'user' ? 'User' : (message.characterName || currentCharacter?.name || 'NPC')}</small>
                             <div class="npc-info-item__actions">
-                                <button type="button" class="npc-info-action-btn" title="Zur Nachricht springen" onclick="jumpToChatMessage('${message.id}')">
-                                    ${NPC_INFO_JUMP_ICON} Springen
+                                <button type="button" class="npc-info-action-btn" title="Jump to message" onclick="jumpToChatMessage('${message.id}')">
+                                    ${NPC_INFO_JUMP_ICON} Jump
                                 </button>
-                                <button type="button" class="npc-info-action-btn npc-info-remove-btn" title="Favorit entfernen" onclick="toggleFavoriteMessage('${message.id}')">
-                                    ${NPC_INFO_REMOVE_ICON} Entfernen
+                                <button type="button" class="npc-info-action-btn npc-info-remove-btn" title="Remove favorite" onclick="toggleFavoriteMessage('${message.id}')">
+                                    ${NPC_INFO_REMOVE_ICON} Remove
                                 </button>
                             </div>
                         </div>
                     </div>
                 `).join('')
-                : `<div class="npc-info-empty">${favoriteQuery ? 'Keine Favoriten gefunden.' : 'Noch keine Favoriten markiert.'}</div>`;
+                : `<div class="npc-info-empty">${favoriteQuery ? 'No favorites found.' : 'No favorites marked yet.'}</div>`;
         }
 
         function getRelevantMemories(historyMessages = null) {
@@ -3242,7 +3242,7 @@
                 const groupVersions = groupId ? chatHistory.filter(m => m.rerollGroupId === groupId).sort((a, b) => a.versionNumber - b.versionNumber) : [];
                 const allowEdits = !isEditingAiMessage && isLastBot && !introGroup && !msg.isLoading;
                 const editBtnHtml = allowEdits ? `
-                    <button type="button" class="msg-edit-btn" title="AI Nachricht bearbeiten" onclick="openEditMessageModal('${msg.id || ''}')">
+                    <button type="button" class="msg-edit-btn" title="Edit message" onclick="openEditMessageModal('${msg.id || ''}')">
                         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zm2.92 2.33H5v-.92l9.06-9.06.92.92L5.92 19.58zM20.71 7.04a1 1 0 0 0 0-1.41l-2.34-2.34a1 1 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
                     </button>
                 ` : '';
@@ -3260,18 +3260,18 @@
                 // Delete-Buttons nur anzeigen, wenn gerade keine KI-Antwort generiert wird.
                 const showDeleteBtn = !isWaitingForAI && !isEditingAiMessage && (isUser || (!isUser && !msg.isIntro && !introGroup && !msg.isLoading));
                 const deleteBtnHtml = showDeleteBtn ? `
-                    <button type="button" class="msg-trash-btn" title="Nachricht löschen" onclick="deleteMessagePair(${originalHistoryIndex})">
+                    <button type="button" class="msg-trash-btn" title="Delete message" onclick="deleteMessagePair(${originalHistoryIndex})">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                     </button>
                 ` : '';
                 const favoriteBtnHtml = (!isUser && !isEditingAiMessage) ? `
-                    <button type="button" class="msg-favorite-btn ${favoriteMessages.includes(msg.id) ? 'is-favorite' : ''}" title="Nachricht favorisieren" onclick="toggleFavoriteMessage('${msg.id || ''}')">
+                    <button type="button" class="msg-favorite-btn ${favoriteMessages.includes(msg.id) ? 'is-favorite' : ''}" title="Favorite message" onclick="toggleFavoriteMessage('${msg.id || ''}')">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                     </button>
                 ` : '';
                 const isSpeakingThis = !isUser && activeSpeechMessageId === msg.id;
                 const speakBtnHtml = (!isUser && !msg.isLoading && !isEditingAiMessage) ? `
-                    <button type="button" class="msg-speak-btn ${isSpeakingThis ? 'is-speaking' : ''}" title="${isSpeakingThis ? 'Vorlesen stoppen' : 'Nachricht vorlesen'}" onclick="toggleSpeakMessage('${msg.id || ''}')">
+                    <button type="button" class="msg-speak-btn ${isSpeakingThis ? 'is-speaking' : ''}" title="${isSpeakingThis ? 'Stop reading' : 'Read message'}" onclick="toggleSpeakMessage('${msg.id || ''}')">
                         ${isSpeakingThis ? `
                         <svg viewBox="0 0 24 24" style="width:15px; height:15px; fill:currentColor;"><path d="M6 6h12v12H6z"/></svg>
                         ` : `
@@ -3285,13 +3285,13 @@
                 
                 const versionControls = showVersionControls ? `
                         <div class="msg-variant-controls">
-                            <button type="button" class="control-btn control-btn-compact" onclick="navigateRerollVersion('${groupId}', -1)" title="Vorherige Version">←</button>
+                            <button type="button" class="control-btn control-btn-compact" onclick="navigateRerollVersion('${groupId}', -1)" title="Previous version">←</button>
                             <span class="msg-version-pill">${getGroupDisplayVersion(groupId)} / ${groupVersions.length}</span>
-                            <button type="button" class="control-btn control-btn-compact" onclick="navigateRerollVersion('${groupId}', 1)" title="Nächste Version">→</button>
+                            <button type="button" class="control-btn control-btn-compact" onclick="navigateRerollVersion('${groupId}', 1)" title="Next version">→</button>
                         </div>
                     ` : '';
                 const rerollButton = showRerollControls ? `
-                        <button type="button" class="control-btn control-btn-compact" onclick="rerollLatestBotMessage()" title="Neue Variante erzeugen">↻</button>
+                        <button type="button" class="control-btn control-btn-compact" onclick="rerollLatestBotMessage()" title="Create new variant">↻</button>
                     ` : '';
                 const continueButton = showRerollControls ? `
                         <button type="button" class="control-btn control-btn-compact" onclick="continueConversation()" title="Continue">C</button>
