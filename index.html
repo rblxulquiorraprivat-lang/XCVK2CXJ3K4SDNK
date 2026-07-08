@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Premium Hub Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -911,119 +912,198 @@
         const SELECTED_PERSONA_KEY = 'storyAI_selected_persona';
         const FILTER_KEY = 'storyAI_last_filter';
 
-        let settings = {
-            textSize: 'Middle',
-            language: 'English',
-            model: 'StoryAI Ultra v2.5',
-            apiKey: ''
-        };
+        const db = new Dexie('StoryAIDatabase');
+        db.version(1).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId'
+        });
 
-        function loadLastFilter() {
+        async function migrateLocalStorage() {
             try {
-                const raw = localStorage.getItem(FILTER_KEY);
-                return raw;
+                const existingKeys = Object.keys(localStorage);
+                if (!existingKeys.length) return;
+
+                const migrations = [];
+                if (existingKeys.includes(STORAGE_KEY)) {
+                    const raw = localStorage.getItem(STORAGE_KEY);
+                    const items = raw ? JSON.parse(raw) : [];
+                    if (Array.isArray(items)) {
+                        for (const item of items) {
+                            if (item && typeof item.id !== 'undefined') {
+                                migrations.push(db.table('characters').put(item));
+                            }
+                        }
+                    }
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+
+                for (const key of existingKeys) {
+                    if (key.startsWith(CHAT_HISTORY_PREFIX)) {
+                        const charId = key.slice(CHAT_HISTORY_PREFIX.length);
+                        const raw = localStorage.getItem(key);
+                        const history = raw ? JSON.parse(raw) : [];
+                        if (Array.isArray(history)) {
+                            migrations.push(db.table('chatHistory').put({ characterId: parseInt(charId, 10), history }));
+                        }
+                        localStorage.removeItem(key);
+                    }
+                }
+
+                if (existingKeys.includes(SETTINGS_KEY)) {
+                    const raw = localStorage.getItem(SETTINGS_KEY);
+                    const value = raw ? JSON.parse(raw) : null;
+                    if (value) {
+                        migrations.push(db.table('settings').put({ id: 1, value }));
+                    }
+                    localStorage.removeItem(SETTINGS_KEY);
+                }
+
+                if (existingKeys.includes(PERSONA_KEY)) {
+                    const raw = localStorage.getItem(PERSONA_KEY);
+                    const value = raw ? JSON.parse(raw) : [];
+                    if (Array.isArray(value)) {
+                        for (const persona of value) {
+                            if (persona && typeof persona.id !== 'undefined') {
+                                migrations.push(db.table('personas').put(persona));
+                            }
+                        }
+                    }
+                    localStorage.removeItem(PERSONA_KEY);
+                }
+
+                if (existingKeys.includes(SELECTED_PERSONA_KEY)) {
+                    const raw = localStorage.getItem(SELECTED_PERSONA_KEY);
+                    const id = raw ? parseInt(raw, 10) : null;
+                    if (id !== null) {
+                        migrations.push(db.table('settings').put({ id: 'selectedPersonaId', value: id }));
+                    }
+                    localStorage.removeItem(SELECTED_PERSONA_KEY);
+                }
+
+                if (existingKeys.includes(FILTER_KEY)) {
+                    const raw = localStorage.getItem(FILTER_KEY);
+                    if (raw !== null) {
+                        migrations.push(db.table('settings').put({ id: 'lastFilter', value: raw }));
+                    }
+                    localStorage.removeItem(FILTER_KEY);
+                }
+
+                await Promise.all(migrations);
+            } catch (err) {
+                console.warn('LocalStorage migration failed:', err);
+            }
+        }
+
+        async function loadLastFilter() {
+            try {
+                const row = await db.table('settings').get('lastFilter');
+                return row?.value ?? null;
             } catch (err) {
                 console.warn('Error loading last filter:', err);
                 return null;
             }
         }
 
-        function saveLastFilter(filter) {
+        async function saveLastFilter(filter) {
             try {
-                localStorage.setItem(FILTER_KEY, filter);
+                await db.table('settings').put({ id: 'lastFilter', value: filter });
             } catch (err) {
                 console.warn('Error saving last filter:', err);
             }
         }
 
-        function loadStoredSettings() {
+        async function loadStoredSettings() {
             try {
-                return JSON.parse(localStorage.getItem(SETTINGS_KEY) || 'null') || {};
+                const row = await db.table('settings').get(1);
+                return row?.value ?? {};
             } catch (err) {
                 console.warn('Error loading stored settings:', err);
                 return {};
             }
         }
 
-        function loadStoredPersonas() {
+        async function saveSettings() {
             try {
-                return JSON.parse(localStorage.getItem(PERSONA_KEY) || '[]');
+                await db.table('settings').put({ id: 1, value: settings });
+            } catch (err) {
+                console.warn('Error saving settings:', err);
+            }
+        }
+
+        async function loadStoredPersonas() {
+            try {
+                return await db.table('personas').toArray();
             } catch (err) {
                 console.warn('Error loading stored personas :', err);
                 return [];
             }
         }
 
-        function savePersonas(personas) {
-            localStorage.setItem(PERSONA_KEY, JSON.stringify(personas));
+        async function savePersonas(personas) {
+            try {
+                await db.table('personas').clear();
+                if (Array.isArray(personas)) {
+                    await db.table('personas').bulkPut(personas);
+                }
+            } catch (err) {
+                console.warn('Error saving personas:', err);
+            }
         }
 
-        function loadSelectedPersonaId() {
+        async function loadSelectedPersonaId() {
             try {
-                const raw = localStorage.getItem(SELECTED_PERSONA_KEY);
-                return raw ? parseInt(raw, 10) : null;
+                const row = await db.table('settings').get('selectedPersonaId');
+                return row?.value ?? null;
             } catch (err) {
                 console.warn('Error loading selected persona:', err);
                 return null;
             }
         }
 
-        function saveSelectedPersonaId(id) {
-            if (id === null || id === undefined) {
-                localStorage.removeItem(SELECTED_PERSONA_KEY);
-            } else {
-                localStorage.setItem(SELECTED_PERSONA_KEY, id.toString());
+        async function saveSelectedPersonaId(id) {
+            try {
+                if (id === null || id === undefined) {
+                    await db.table('settings').delete('selectedPersonaId');
+                } else {
+                    await db.table('settings').put({ id: 'selectedPersonaId', value: id });
+                }
+            } catch (err) {
+                console.warn('Error saving selected persona:', err);
             }
         }
 
-        function saveSettings() {
-            localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
-        }
-
-        function setSetting(key, value) {
-            settings[key] = value;
-            saveSettings();
-            renderMainArea();
-        }
-
-        const storedSettings = loadStoredSettings();
-        settings = { ...settings, ...storedSettings };
-        let personas = loadStoredPersonas();
-        let selectedPersonaId = loadSelectedPersonaId();
-
-        let items = [];
-
-        function isLegacyDemoItem(item) {
-            if (!item) return false;
-            const legacyIds = new Set([1, 2, 3, 4, 5, 6]);
-            const legacyNames = new Set([
-                'Konata Izumi',
-                'Kotonoha Katsura',
-                'Neo-Tokyo 2077',
-                'Der letzte Funke',
-                'Schatten über Dunwall',
-                'Aria Nebelfrost'
-            ]);
-            return legacyIds.has(item.id) || legacyNames.has(item.name);
-        }
-
-        function loadStoredItems() {
+        async function loadStoredItems() {
             try {
-                return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+                return await db.table('characters').toArray();
             } catch (err) {
                 console.warn('Error loading stored items:', err);
                 return [];
             }
         }
 
-        function saveStoredItems(itemsToSave) {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(itemsToSave));
+        async function saveStoredItems(itemsToSave) {
+            try {
+                await db.transaction('rw', db.characters, async () => {
+                    await db.characters.clear();
+                    if (Array.isArray(itemsToSave)) {
+                        await db.characters.bulkPut(itemsToSave);
+                    }
+                });
+            } catch (err) {
+                console.warn('Error saving stored items:', err);
+            }
         }
 
-        function getStoryMessageCount(itemId) {
+        async function getStoryMessageCount(itemId) {
             try {
-                const raw = localStorage.getItem(CHAT_HISTORY_PREFIX + itemId);
-                const history = JSON.parse(raw || '[]');
+                const row = await db.table('chatHistory').get(parseInt(itemId, 10));
+                const history = row?.history ?? [];
                 if (!Array.isArray(history)) return 0;
                 const seenGroups = new Set();
                 return history.reduce((count, msg) => {
@@ -1039,11 +1119,7 @@
             }
         }
 
-        function generateNewItemId() {
-            return Date.now(); // Verhindert ID-Wiederverwendung und damit Ghost-Stories
-        }
-
-        function createStoryFromCharacter(characterId) {
+        async function createStoryFromCharacter(characterId) {
             const character = items.find(i => i.id === characterId && i.type === 'character');
             if (!character) return;
             const newStory = {
@@ -1066,23 +1142,101 @@
                 characterName: character.name
             };
             items.push(newStory);
-            saveStoredItems(items);
+            await saveStoredItems(items);
             window.location.href = `Character/GameCharacter.html?id=${newStory.id}`;
         }
 
-        const storedItems = loadStoredItems();
-        if (storedItems.length) {
-            const filteredStoredItems = storedItems.filter(item => !isLegacyDemoItem(item));
-            const merged = new Map(items.map(item => [item.id, item]));
-            filteredStoredItems.forEach(item => {
-                merged.set(item.id, item);
-            });
-            items = Array.from(merged.values());
-            if (filteredStoredItems.length !== storedItems.length) {
-                saveStoredItems(items);
+        let settings = {
+            textSize: 'Middle',
+            language: 'English',
+            model: 'StoryAI Ultra v2.5',
+            apiKey: ''
+        };
+
+
+        async function setSetting(key, value) {
+            settings[key] = value;
+            await saveSettings();
+            renderMainArea();
+        }
+
+        let personas = [];
+        let selectedPersonaId = null;
+        let items = [];
+        let storyMessageCounts = new Map();
+
+        async function preloadStoryMessageCounts() {
+            try {
+                const histories = await db.table('chatHistory').toArray();
+                storyMessageCounts = new Map(
+                    histories.map(row => {
+                        const history = Array.isArray(row.history) ? row.history : [];
+                        const seenGroups = new Set();
+                        const count = history.reduce((num, msg) => {
+                            if (msg && msg.rerollGroupId) {
+                                if (seenGroups.has(msg.rerollGroupId)) return num;
+                                seenGroups.add(msg.rerollGroupId);
+                                return num + 1;
+                            }
+                            return num + 1;
+                        }, 0);
+                        return [String(row.characterId), count];
+                    })
+                );
+            } catch (err) {
+                console.warn('Error preloading story message counts:', err);
+                storyMessageCounts = new Map();
             }
-        } else {
-            saveStoredItems(items);
+        }
+
+        async function initializeApp() {
+            await migrateLocalStorage();
+            settings = { ...settings, ...await loadStoredSettings() };
+            personas = await loadStoredPersonas();
+            selectedPersonaId = await loadSelectedPersonaId();
+            items = await loadStoredItems();
+
+            const filteredStoredItems = items.filter(item => !isLegacyDemoItem(item));
+            const merged = new Map(items.map(item => [item.id, item]));
+            filteredStoredItems.forEach(item => merged.set(item.id, item));
+            items = Array.from(merged.values());
+
+            if (filteredStoredItems.length !== items.length) {
+                await saveStoredItems(items);
+            } else if (items.length === 0) {
+                await saveStoredItems(items);
+            }
+
+            const loadedFilter = await loadLastFilter();
+            if (validFilters.includes(loadedFilter)) {
+                if (loadedFilter === 'favorite' && !items.some(item => item.favorite)) {
+                    currentFilter = 'all';
+                    await saveLastFilter('all');
+                } else {
+                    currentFilter = loadedFilter;
+                }
+            }
+
+            await preloadStoryMessageCounts();
+            renderApp();
+        }
+
+        function isLegacyDemoItem(item) {
+            if (!item) return false;
+            const legacyIds = new Set([1, 2, 3, 4, 5, 6]);
+            const legacyNames = new Set([
+                'Konata Izumi',
+                'Kotonoha Katsura',
+                'Neo-Tokyo 2077',
+                'Der letzte Funke',
+                'Schatten über Dunwall',
+                'Aria Nebelfrost'
+            ]);
+            return legacyIds.has(item.id) || legacyNames.has(item.name);
+        }
+
+        function generateNewItemId() {
+            return Date.now(); // Verhindert ID-Wiederverwendung und damit Ghost-Stories
         }
 
         let activeId = null;
@@ -1096,15 +1250,6 @@
         let personaViewSearchQuery = '';
 
         const validFilters = ['all', 'character', 'world', 'story', 'favorite'];
-        const loadedFilter = loadLastFilter();
-        if (validFilters.includes(loadedFilter)) {
-            if (loadedFilter === 'favorite' && !items.some(item => item.favorite)) {
-                currentFilter = 'all';
-                saveLastFilter('all');
-            } else {
-                currentFilter = loadedFilter;
-            }
-        }
 
         function timeAgo(timestamp) {
             const seconds = Math.floor((Date.now() - timestamp) / 1000);
@@ -1398,14 +1543,17 @@
             renderApp();
         }
 
-        function deleteItem(id) {
+        async function deleteItem(id) {
             if (!confirm('Really delete this entry?')) return;
-            items = items.filter(i => i.id !== id);
-            saveStoredItems(items);
-            
-            // WICHTIG: Chatverlauf ebenfalls endgültig löschen!
-            localStorage.removeItem(CHAT_HISTORY_PREFIX + id);
-            
+            try {
+                await db.table('characters').delete(id);
+                await db.table('chatHistory').delete(parseInt(id, 10));
+            } catch (err) {
+                console.warn('Error deleting item or its chat history:', err);
+            }
+
+            items = await loadStoredItems();
+
             // Falls das gelöschte Item gerade aktiv oder im Edit-Modus war
             if (activeId === id) {
                 goBackToLibrary();
@@ -1801,7 +1949,10 @@
         }
 
         // Initialisierung
-        renderApp();
+        initializeApp().catch(err => {
+            console.error('App initialization failed:', err);
+            renderApp();
+        });
     </script>
 </body>
 </html>
