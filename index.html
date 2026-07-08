@@ -1198,7 +1198,10 @@
 
                 env.allowRemoteModels = false;   // never hit the Hugging Face Hub
                 env.allowLocalModels = true;
-                env.localModelPath = '/models/'; // models must live in this local folder
+                // Relativer Pfad (kein führendes "/"!), damit er sich relativ zur
+                // aktuellen Seite auflöst (z.B. /XCVK2CXJ3K4SDNK/models/...)
+                // statt zur Domain-Wurzel (das war die Ursache der 404-Fehler).
+                env.localModelPath = new URL('./models/', window.location.href).href;
 
                 await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
                     local_files_only: true
@@ -1208,7 +1211,7 @@
             } catch (err) {
                 console.warn('Could not load local Transformer.js model:', err);
                 setModelStatus('not-loaded');
-                alert('Could not load the local model. Make sure it is placed inside your /models/ folder.');
+                alert('Could not load the local model. Make sure it is placed inside the models/ folder next to this page.');
             }
         }
 
