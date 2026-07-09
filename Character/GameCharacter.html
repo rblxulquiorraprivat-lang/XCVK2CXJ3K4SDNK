@@ -483,6 +483,12 @@
             display: grid;
             gap: 16px;
             overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .npc-info-modal__body::-webkit-scrollbar {
+            display: none;
         }
 
         .npc-info-section {
@@ -540,6 +546,14 @@
             display: flex;
             flex-direction: column;
             gap: 8px;
+            height: 260px;
+            overflow-y: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .npc-info-list::-webkit-scrollbar {
+            display: none;
         }
 
         .npc-info-item {
@@ -835,30 +849,27 @@
         }
 
         .msg-edit-btn {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            width: 30px;
-            height: 30px;
-            border-radius: 12px;
-            border: 1px solid rgba(255,255,255,0.12);
-            background: rgba(0,0,0,0.25);
-            color: rgba(255,255,255,0.8);
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            padding: 2px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            cursor: pointer;
             transition: var(--transition);
+            opacity: 0.7;
         }
 
         .msg-edit-btn:hover {
-            background: rgba(255,255,255,0.08);
-            color: #fff;
+            color: var(--char-color, #6366f1);
+            opacity: 1;
+            transform: scale(1.1);
         }
 
         .msg-edit-btn svg {
-            width: 16px;
-            height: 16px;
+            width: 15px;
+            height: 15px;
             fill: currentColor;
         }
 
@@ -2582,6 +2593,29 @@
         const NPC_INFO_JUMP_ICON = '<svg viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>';
         const NPC_INFO_REMOVE_ICON = '<svg viewBox="0 0 24 24"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>';
 
+        // Ermittelt den korrekten Anzeigenamen für einen Memory-Eintrag: bei
+        // Spieler-Nachrichten den Persona-Namen (statt "User"), bei NPC-Nachrichten
+        // den tatsächlichen Charakternamen (statt des Story-Titels). Dazu wird
+        // wenn möglich die zugehörige Chat-Nachricht herangezogen, da diese den
+        // zum Zeitpunkt der Nachricht gültigen Namen gespeichert hat.
+        function getMemoryDisplayName(memory) {
+            if (!memory) return '';
+            const targetMessageId = resolveMemoryTargetMessageId(memory);
+            const targetMsg = targetMessageId ? chatHistory.find(m => m && m.id === targetMessageId) : null;
+            if (memory.sender === 'user') {
+                return (targetMsg && targetMsg.name) || (selectedPersona && selectedPersona.name) || 'You';
+            }
+            return (targetMsg && targetMsg.characterName) || getCharacterName();
+        }
+
+        function getFavoriteMessageDisplayName(message) {
+            if (!message) return '';
+            if (message.sender === 'user') {
+                return message.name || (selectedPersona && selectedPersona.name) || 'You';
+            }
+            return message.characterName || getCharacterName();
+        }
+
         function renderNpcInfoModal() {
             const memoriesList = document.getElementById('npcMemoriesList');
             const favoritesList = document.getElementById('npcFavoriteMessagesList');
@@ -2597,7 +2631,7 @@
                     <div class="npc-info-item">
                         <div class="npc-info-item__text">${escapeHtml(String(memory.text || '').trim())}</div>
                         <div class="npc-info-item__footer">
-                            <small>${memory.sender === 'user' ? 'User' : (currentCharacter?.name || 'NPC')}</small>
+                            <small>${escapeHtml(getMemoryDisplayName(memory))}</small>
                             <div class="npc-info-item__actions">
                                 <button type="button" class="npc-info-action-btn" title="Jump to message" onclick="jumpToMemory('${memory.id}')">
                                     ${NPC_INFO_JUMP_ICON} Jump
@@ -2619,7 +2653,7 @@
                     <div class="npc-info-item">
                         <div class="npc-info-item__text">${escapeHtml(String(message.text || '').trim())}</div>
                         <div class="npc-info-item__footer">
-                            <small>${message.sender === 'user' ? 'User' : (message.characterName || currentCharacter?.name || 'NPC')}</small>
+                            <small>${escapeHtml(getFavoriteMessageDisplayName(message))}</small>
                             <div class="npc-info-item__actions">
                                 <button type="button" class="npc-info-action-btn" title="Jump to message" onclick="jumpToChatMessage('${message.id}')">
                                     ${NPC_INFO_JUMP_ICON} Jump
@@ -3252,7 +3286,7 @@
                             <span></span><span></span><span></span>
                         </div>
                     </div>
-                ` : `<div class="msg-content">${editBtnHtml}${formattedText}</div>`;
+                ` : `<div class="msg-content">${formattedText}</div>`;
                 
                 // Index im originalen chatHistory-Array finden, um das korrekte Löschen zu triggern
                 const originalHistoryIndex = chatHistory.findIndex(m => m === msg);
@@ -3264,7 +3298,7 @@
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>
                     </button>
                 ` : '';
-                const favoriteBtnHtml = (!isUser && !isEditingAiMessage) ? `
+                const favoriteBtnHtml = (!isUser && !isEditingAiMessage && !msg.isLoading) ? `
                     <button type="button" class="msg-favorite-btn ${favoriteMessages.includes(msg.id) ? 'is-favorite' : ''}" title="Favorite message" onclick="toggleFavoriteMessage('${msg.id || ''}')">
                         <svg viewBox="0 0 24 24" style="width:14px; height:14px; fill:currentColor;"><path d="M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z"/></svg>
                     </button>
@@ -3314,6 +3348,7 @@
                             <div class="msg-header-row">
                                 <div class="msg-sender-name">${displayName}</div>
                                 <div class="msg-header-actions">
+                                    ${editBtnHtml}
                                     ${speakBtnHtml}
                                     ${favoriteBtnHtml}
                                     ${deleteBtnHtml}
