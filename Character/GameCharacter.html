@@ -24,6 +24,7 @@
             document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
         }
     </script>
+    <script src="https://cdn.jsdelivr.net/npm/chrono-node@2.3.8/dist/bundle.min.js"></script>
     <script>
         const BRIDGE_MESSAGE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -398,7 +399,21 @@
 
         .topbar-actions-right {
             display: flex;
+            align-items: center;
             gap: 10px;
+        }
+
+        .in-game-time-pill {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-size: 0.84rem;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            white-space: nowrap;
+            user-select: none;
         }
 
         .control-btn {
@@ -1430,6 +1445,7 @@
                     </div>
                 </div>
                 <div class="topbar-actions-right">
+                    <div class="in-game-time-pill" id="inGameTimeDisplay">--:--, --</div>
                     <button type="button" class="control-btn icon-btn" id="npcInfoBtn" onclick="toggleNpcInfoModal()" title="NPC Memories & Favorites">
                         <svg viewBox="0 0 24 24">
                             <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96c-.5-.38-1.04-.7-1.64-.94L14.4 2.5a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.6.24-1.14.56-1.64.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 10.74a.5.5 0 0 0 .12.64l2.03 1.58c-.04.3-.06.61-.06.94s.02.64.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.38 1.04.7 1.64.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .49-.42l.36-2.54c.6-.24 1.14-.56 1.64-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
@@ -1736,6 +1752,8 @@
         // actual Transformer.js pipeline, so it reports status back via
         // BroadcastChannel (same-browser, instant) and localStorage (fallback / persistence). ---
         const MODEL_STATUS_KEY = 'storyai_model_status';
+        const MODEL_ID_KEY = 'storyai_transformer_model_id';
+        const MODEL_LANGUAGE_KEY = 'storyai_model_language';
         let modelStatusChannel = null;
         try {
             modelStatusChannel = new BroadcastChannel('storyai-model-status');
@@ -1772,6 +1790,65 @@
         let editingMessageId = null;
         let npcMemoriesSearchQuery = '';
         let npcFavoritesSearchQuery = '';
+        let inGameDate = new Date();
+
+        function getInGameLocale() {
+            return settings?.language === 'German' ? 'de-DE' : 'en-US';
+        }
+
+        function formatInGameTimeLabel(date) {
+            const dt = date instanceof Date && !Number.isNaN(date.getTime()) ? date : new Date();
+            const locale = getInGameLocale();
+            const time = new Intl.DateTimeFormat(locale, { hour: 'numeric', minute: '2-digit' }).format(dt);
+            const weekday = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(dt);
+            return `${time}, ${weekday}`;
+        }
+
+        function updateInGameTimeUI() {
+            const el = document.getElementById('inGameTimeDisplay');
+            if (!el) return;
+            el.textContent = formatInGameTimeLabel(inGameDate);
+        }
+
+        function setInGameDate(nextDate) {
+            const dt = nextDate instanceof Date ? nextDate : null;
+            if (!dt || Number.isNaN(dt.getTime())) return;
+            inGameDate = dt;
+            try { window.inGameDate = inGameDate; } catch (_) {}
+            updateInGameTimeUI();
+        }
+
+        function initInGameTimeSystem() {
+            try { window.inGameDate = inGameDate; } catch (_) {}
+            updateInGameTimeUI();
+        }
+
+        function parseInGameTimeFromText(text) {
+            const input = String(text || '').trim();
+            if (!input) return null;
+            if (typeof chrono === 'undefined') return null;
+            const ref = inGameDate instanceof Date && !Number.isNaN(inGameDate.getTime()) ? inGameDate : new Date();
+            const results = (() => {
+                try {
+                    if (settings?.language === 'German' && chrono.de && typeof chrono.de.parse === 'function') {
+                        return chrono.de.parse(input, ref);
+                    }
+                    if (typeof chrono.parse === 'function') {
+                        return chrono.parse(input, ref);
+                    }
+                } catch (_) {}
+                return [];
+            })();
+            const first = Array.isArray(results) ? results.find(r => r && r.start) : null;
+            if (!first || !first.start || typeof first.start.date !== 'function') return null;
+            try { return first.start.date(); } catch (_) { return null; }
+        }
+
+        function applyInGameTimeFromAiText(text) {
+            const parsed = parseInGameTimeFromText(text);
+            if (!parsed) return;
+            setInGameDate(parsed);
+        }
 
         const isMobileChatInput = (() => {
             try {
@@ -1908,10 +1985,21 @@
         // model weights must be present locally in the game folder - the Hugging Face
         // Hub is never contacted, even as a fallback.
         async function initTransformerJS() {
+            const desiredLanguage = settings?.language || 'English';
+            const desiredModelId = (() => {
+                try {
+                    const fromStorage = localStorage.getItem(MODEL_ID_KEY);
+                    if (fromStorage) return fromStorage;
+                } catch (_) {}
+                return desiredLanguage === 'German' ? 'all-MiniLM-L6-v2.de' : 'all-MiniLM-L6-v2.en';
+            })();
             const previousModelStatus = (() => {
                 try { return localStorage.getItem(MODEL_STATUS_KEY); } catch (_) { return null; }
             })();
-            if (previousModelStatus !== 'loaded') {
+            const previousModelLanguage = (() => {
+                try { return localStorage.getItem(MODEL_LANGUAGE_KEY); } catch (_) { return null; }
+            })();
+            if (previousModelStatus !== 'loaded' || previousModelLanguage !== desiredLanguage) {
                 reportModelStatus('loading');
             }
             try {
@@ -1928,9 +2016,21 @@
                 env.localModelPath = new URL('./models/', window.location.href).href;
 
                 // Allocate the pipeline only after the env is locked to local-only.
-                transformerPipeline = await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
-                    local_files_only: true
-                });
+                let loadedModelId = null;
+                const modelCandidates = desiredModelId === 'all-MiniLM-L6-v2'
+                    ? ['all-MiniLM-L6-v2']
+                    : [desiredModelId, 'all-MiniLM-L6-v2'];
+                for (const candidate of modelCandidates) {
+                    try {
+                        transformerPipeline = await pipeline('feature-extraction', candidate, { local_files_only: true });
+                        loadedModelId = candidate;
+                        break;
+                    } catch (e) {
+                        if (candidate === modelCandidates[modelCandidates.length - 1]) {
+                            throw e;
+                        }
+                    }
+                }
 
                 const embed = async (text) => {
                     const output = await transformerPipeline(text, { pooling: 'mean', normalize: true });
@@ -1980,6 +2080,9 @@
                 }
 
                 reportModelStatus('loaded');
+                try { localStorage.setItem(MODEL_LANGUAGE_KEY, desiredLanguage); } catch (_) {}
+                try { localStorage.setItem(MODEL_ID_KEY, loadedModelId || desiredModelId); } catch (_) {}
+                return true;
             } catch (err) {
                 console.warn('Could not initialize Transformer.js pipeline:', err);
                 transformerPipeline = null;
@@ -1994,6 +2097,7 @@
                 if (!isAbort && !isHidden && !isPageUnloading) {
                     reportModelStatus('not-loaded');
                 }
+                return false;
             }
         }
 
@@ -2002,19 +2106,8 @@
         async function initMemorySystem() {
             const preference = settings.memorySystem;
             if (preference === 'Transformer.js') {
-                const status = (() => {
-                    try { return localStorage.getItem(MODEL_STATUS_KEY); } catch (_) { return null; }
-                })();
-                if (status !== 'loaded') {
-                    settings.memorySystem = 'Orama';
-                    try { await db.table('settings').put({ id: 1, value: settings }); } catch (err) { console.warn('Error saving settings:', err); }
-                    try { localStorage.setItem(MEMORY_SYSTEM_SYNC_KEY, 'Orama'); } catch (_) {}
-                    try { settingsSyncChannel?.postMessage({ type: 'memorySystem', value: 'Orama' }); } catch (_) {}
-                    await initOrama();
-                    return;
-                }
-                await initTransformerJS();
-                return;
+                const ok = await initTransformerJS();
+                if (ok) return;
             }
             await initOrama();
         }
@@ -2123,6 +2216,7 @@
             // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
             await migrateLegacyLocalStorage();
             settings = { ...settings, ...await loadStoredSettings() };
+            initInGameTimeSystem();
             // Respect the user's "Memory System" choice from Dexie (Orama or Transformer.js)
             await initMemorySystem();
             const urlParams = new URLSearchParams(window.location.search);
@@ -2935,6 +3029,7 @@
             lines.push('When the conversation context mentions the player, label them as "The User".');
             lines.push('Use vivid, immersive prose and keep the reply emotionally grounded.');
             lines.push('Wrap spoken dialogue in double quotes. Use asterisks only for actions or expressions. Do not keep the asterisks in the final rendered text.');
+            lines.push(`Current In-Game Time: ${formatInGameTimeLabel(inGameDate)}`);
             lines.push(`Response Style: ${languageInstruction} ${textSizeInstruction}`);
 
             if (mode === 'intro') {
@@ -3418,6 +3513,7 @@
                 if (!normalizedResponse) {
                     throw new Error('Verbindung zum KI-Server blockiert');
                 }
+                try { applyInGameTimeFromAiText(normalizedResponse); } catch (_) {}
                 try {
                     if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
                 } catch (e) { /* ignore */ }
