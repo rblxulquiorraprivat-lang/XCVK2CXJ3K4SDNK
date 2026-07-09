@@ -1151,8 +1151,6 @@
         // --- Transformer.js model status (synced across pages, since the actual
         // pipeline is loaded on the chat page / GameCharacter.html) ---
         const MODEL_STATUS_KEY = 'storyai_model_status';
-        const MODEL_ID_KEY = 'storyai_transformer_model_id';
-        const MODEL_LANGUAGE_KEY = 'storyai_model_language';
         let modelStatus = localStorage.getItem(MODEL_STATUS_KEY) || 'not-loaded'; // 'not-loaded' | 'loading' | 'loaded'
 
         let modelStatusChannel = null;
@@ -1183,7 +1181,6 @@
                 const storedStatus = localStorage.getItem(MODEL_STATUS_KEY);
                 if (storedStatus) modelStatus = storedStatus;
             } catch (_) {}
-            syncTransformerModelSelection();
             renderMainArea();
         });
 
@@ -1192,14 +1189,6 @@
             try { localStorage.setItem(MODEL_STATUS_KEY, status); } catch (err) { /* ignore */ }
             try { modelStatusChannel?.postMessage({ status }); } catch (err) { /* ignore */ }
             renderMainArea();
-        }
-
-        function getTransformerModelIdForLanguage(language) {
-            return language === 'German' ? 'all-MiniLM-L6-v2.de' : 'all-MiniLM-L6-v2.en';
-        }
-
-        function syncTransformerModelSelection() {
-            try { localStorage.setItem(MODEL_ID_KEY, getTransformerModelIdForLanguage(settings.language)); } catch (_) {}
         }
 
         const MEMORY_SYSTEM_SYNC_KEY = 'storyai_memory_system';
@@ -1229,8 +1218,29 @@
         // page so the user can "warm up" / verify the model without opening a chat.
         // STRICT RULE: no external APIs — only files inside the local /models/ folder.
         async function loadTransformerModelFromSettings() {
-            syncTransformerModelSelection();
-            alert('Das lokale Modell wird automatisch erst dann geladen, wenn du eine Story öffnest und als Memory System "Transformer.js" gewählt hast.');
+            if (modelStatus === 'loading') return;
+            setModelStatus('loading');
+            try {
+                // Load the transformers.js library from the local project folder, not a CDN.
+                const { env, pipeline } = await import('./libs/transformers.min.js');
+
+                env.allowRemoteModels = false;   // never hit the Hugging Face Hub
+                env.allowLocalModels = true;
+                // Relativer Pfad (kein führendes "/"!), damit er sich relativ zur
+                // aktuellen Seite auflöst (z.B. /XCVK2CXJ3K4SDNK/models/...)
+                // statt zur Domain-Wurzel (das war die Ursache der 404-Fehler).
+                env.localModelPath = new URL('./models/', window.location.href).href;
+
+                await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
+                    local_files_only: true
+                });
+
+                setModelStatus('loaded');
+            } catch (err) {
+                console.warn('Could not load local Transformer.js model:', err);
+                setModelStatus('not-loaded');
+                alert('Could not load the local model. Make sure it is placed inside the models/ folder next to this page.');
+            }
         }
 
         async function loadLastFilter() {
@@ -1314,17 +1324,8 @@
         }
 
         async function setSetting(key, value) {
-            const previousLanguage = settings.language;
             settings[key] = value;
             await saveSettings();
-            if (key === 'language' && previousLanguage !== value) {
-                syncTransformerModelSelection();
-                try { localStorage.removeItem(MODEL_LANGUAGE_KEY); } catch (_) {}
-                if (modelStatus === 'loaded') {
-                    setModelStatus('not-loaded');
-                    return;
-                }
-            }
             renderMainArea();
         }
 
@@ -1470,7 +1471,6 @@
         async function createStoryFromCharacter(characterId) {
             const character = items.find(i => i.id === characterId && i.type === 'character');
             if (!character) return;
-            syncTransformerModelSelection();
             const newStory = {
                 id: generateNewItemId(),
                 type: 'story',
@@ -1517,7 +1517,6 @@
             // Settings, Personas & ausgewählte Persona aus der DB laden
             const storedSettings = await loadStoredSettings();
             settings = { ...settings, ...storedSettings };
-            syncTransformerModelSelection();
             personas = await loadStoredPersonas();
             selectedPersonaId = await loadSelectedPersonaId();
 
@@ -1883,7 +1882,6 @@
         function playItem(id) {
             const item = items.find(i => i.id === id);
             if (!item) return;
-            syncTransformerModelSelection();
             if (item.type === 'story') {
                 window.location.href = `Character/GameCharacter.html?id=${id}`;
             } else {
