@@ -945,6 +945,13 @@
             outline: none;
             font-size: 0.98rem;
             line-height: 1.55;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .edit-msg-textarea::-webkit-scrollbar {
+            width: 0;
+            height: 0;
         }
 
         .edit-msg-textarea:focus {
@@ -1067,6 +1074,13 @@
             max-height: 120px;
             height: 44px;
             line-height: 1.5;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .chat-textarea::-webkit-scrollbar {
+            width: 0;
+            height: 0;
         }
 
         .chat-textarea::placeholder {
@@ -1781,6 +1795,7 @@
             } catch (_) {}
             return false;
         })();
+        let shouldRestoreChatInputFocus = false;
 
         function applyInteractionLocks() {
             const sendBtn = document.getElementById('sendBtn');
@@ -1915,17 +1930,23 @@
                 reportModelStatus('loading');
             }
             try {
-                // Import the local build of the library from your project folder
-                // (e.g. ./libs/transformers.min.js). Do NOT point this at a CDN.
-                const { env, pipeline } = await import('./libs/transformers.min.js');
+                // Import the local build of the library from the project's root folder.
+                // GameCharacter.html lives one directory below index.html (in "Character/"),
+                // so the path must go up one level ("../libs/..."); using "./libs/..." here
+                // was resolving to "Character/libs/..." instead of the actual "libs/" folder
+                // next to index.html. That caused this import (and the model load below) to
+                // fail with a 404 every time a story was opened, which in turn reported
+                // "not-loaded" back to index.html and wiped out an already-successful
+                // "Model loaded" status - Do NOT point this at a CDN.
+                const { env, pipeline } = await import('../libs/transformers.min.js');
 
                 // Disable remote model loading from the Hugging Face Hub entirely.
                 env.allowRemoteModels = false;
                 env.allowLocalModels = true;
-                // Relativer Pfad (kein führendes "/"!), damit er sich relativ zur
-                // aktuellen Seite auflöst (z.B. /XCVK2CXJ3K4SDNK/models/...)
-                // statt zur Domain-Wurzel (das war die Ursache der 404-Fehler).
-                env.localModelPath = new URL('./models/', window.location.href).href;
+                // Relativer Pfad (kein führendes "/"!), eine Ebene nach oben ("../models/"),
+                // damit er zum "models/"-Ordner neben index.html aufgelöst wird und nicht
+                // fälschlicherweise zu "Character/models/" (Ursache der 404-Fehler).
+                env.localModelPath = new URL('../models/', window.location.href).href;
 
                 // Allocate the pipeline only after the env is locked to local-only.
                 transformerPipeline = await pipeline('feature-extraction', 'all-MiniLM-L6-v2', {
@@ -2816,6 +2837,7 @@
             if (confirm("Möchtest du diese Nachricht und die dazugehörige Unterhaltung wirklich löschen?")) {
                 const indicesToRemove = new Set([msgIndex]);
                 const groupIdsToClear = new Set();
+                const messageIdsToRemove = new Set();
 
                 // Alle Reroll-Varianten einer Bot-Nachricht mitlöschen, nicht nur die
                 // gerade sichtbare Version - sonst "überlebt" die Nachricht einfach in
@@ -2844,7 +2866,11 @@
                     }
                 }
 
-                chatHistory = chatHistory.filter((_, idx) => !indicesToRemove.has(idx));
+                indicesToRemove.forEach(idx => {
+                    const msg = chatHistory[idx];
+                    if (msg && msg.id) messageIdsToRemove.add(msg.id);
+                });
+                chatHistory = chatHistory.filter((msg, idx) => !indicesToRemove.has(idx) && !(msg && msg.id && messageIdsToRemove.has(msg.id)));
 
                 // Verwaiste Seiten-/Versionszeiger für komplett gelöschte Reroll-Gruppen
                 // entfernen, damit sich in der Datenbank kein Datenmüll ansammelt.
@@ -2900,6 +2926,14 @@
             lines.push(`Character Name: ${characterName}`);
             if (currentCharacter?.storyName && currentCharacter.storyName.trim() && currentCharacter.storyName.trim() !== characterName) {
                 lines.push(`Story Name: ${currentCharacter.storyName.trim()}`);
+            }
+            const characterAge = Number.isFinite(currentCharacter?.age) ? currentCharacter.age : parseInt(currentCharacter?.age, 10);
+            if (Number.isFinite(characterAge)) lines.push(`Age: ${characterAge} years old`);
+            const birthMonthNum = parseInt(currentCharacter?.birthMonth, 10);
+            const birthDayNum = parseInt(currentCharacter?.birthDay, 10);
+            if (Number.isFinite(birthMonthNum) && birthMonthNum >= 1 && birthMonthNum <= 12 && Number.isFinite(birthDayNum)) {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                lines.push(`Birthday: ${monthNames[birthMonthNum - 1]} ${birthDayNum}`);
             }
             if (currentCharacter?.generally) lines.push(`General Character Traits: ${currentCharacter.generally}`);
             if (currentCharacter?.appearance) lines.push(`Appearance: ${currentCharacter.appearance}`);
@@ -3582,12 +3616,15 @@
         }
 
         function setLoadingState(isLoading) {
+            const chatInput = document.getElementById('chatInput');
+            if (isLoading && chatInput) {
+                shouldRestoreChatInputFocus = document.activeElement === chatInput;
+            }
             isWaitingForAI = isLoading;
             const logArea = document.getElementById('storyLog');
             if (isLoading && logArea) logArea.scrollTop = logArea.scrollHeight;
             applyInteractionLocks();
-            const chatInput = document.getElementById('chatInput');
-            if (!isWaitingForAI && !isEditingAiMessage && chatInput && !chatInput.disabled) {
+            if (!isWaitingForAI && !isEditingAiMessage && chatInput && !chatInput.disabled && !isMobileChatInput && shouldRestoreChatInputFocus) {
                 try { chatInput.focus(); } catch (_) {}
             }
             renderChatLog();

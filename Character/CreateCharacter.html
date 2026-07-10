@@ -788,6 +788,41 @@
                             <label class="form-label" for="charShortDesc">Short Desc <span style="font-weight:400; color: var(--text-muted); text-transform:none;">(optional)</span></label>
                             <input type="text" id="charShortDesc" class="form-control" placeholder="Anime Otaku • Fröhlich" oninput="updatePreview()">
                         </div>
+
+                        <div class="form-group">
+                            <label class="form-label" for="charAge">Age <span style="font-weight:400; color: var(--text-muted); text-transform:none;">(optional)</span></label>
+                            <input type="number" id="charAge" class="form-control" min="0" max="9999" step="1" placeholder="e.g., 17" oninput="updatePreview()">
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Birthdate <span style="font-weight:400; color: var(--text-muted); text-transform:none;">(optional)</span></label>
+                            <div style="display:flex; gap:12px;">
+                                <div style="flex:1;">
+                                    <label class="form-label" for="charBirthMonth" style="font-size:0.78rem; font-weight:400; text-transform:none; color: var(--text-muted); margin-bottom:6px;">Month</label>
+                                    <select id="charBirthMonth" class="form-control" onchange="updateBirthDayOptions(); updatePreview();">
+                                        <option value="">-- Month --</option>
+                                        <option value="1">1 - January</option>
+                                        <option value="2">2 - February</option>
+                                        <option value="3">3 - March</option>
+                                        <option value="4">4 - April</option>
+                                        <option value="5">5 - May</option>
+                                        <option value="6">6 - June</option>
+                                        <option value="7">7 - July</option>
+                                        <option value="8">8 - August</option>
+                                        <option value="9">9 - September</option>
+                                        <option value="10">10 - October</option>
+                                        <option value="11">11 - November</option>
+                                        <option value="12">12 - December</option>
+                                    </select>
+                                </div>
+                                <div style="flex:1;">
+                                    <label class="form-label" for="charBirthDay" style="font-size:0.78rem; font-weight:400; text-transform:none; color: var(--text-muted); margin-bottom:6px;">Day</label>
+                                    <select id="charBirthDay" class="form-control" onchange="updatePreview()">
+                                        <option value="">-- Day --</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </section>
 
@@ -997,6 +1032,7 @@
 
                     <div class="preview-details-grid">
                         <div class="preview-detail-item"><strong>Status:</strong> <span id="previewStatusText">Lokal angelegt</span></div>
+                        <div class="preview-detail-item"><strong>🎂 Age / Birthdate:</strong> <span id="previewAgeBirth">—</span></div>
                         <div class="preview-detail-item"><strong>Introductions:</strong> <span id="previewIntroductionsCount">0</span></div>
                         <div class="preview-detail-item"><strong>🔊 Voice:</strong> <span id="previewVoiceLabel">Standardstimme</span></div>
                     </div>
@@ -1024,6 +1060,38 @@
             return params.get(name);
         }
 
+        // Days per month (Februar bekommt 29 Tage zur Auswahl, damit auch
+        // Schaltjahr-Geburtstage wählbar sind - es wird kein Jahr erfasst).
+        const DAYS_IN_MONTH = { 1: 31, 2: 29, 3: 31, 4: 30, 5: 31, 6: 30, 7: 31, 8: 31, 9: 30, 10: 31, 11: 30, 12: 31 };
+
+        // Baut die Tagesauswahl passend zum gewaehlten Monat neu auf.
+        // preserveValue: optionaler Tageswert, der (falls noch gueltig) uebernommen werden soll,
+        // z.B. beim Laden eines gespeicherten Charakters (populateForm).
+        function updateBirthDayOptions(preserveValue) {
+            const monthSelect = document.getElementById('charBirthMonth');
+            const daySelect = document.getElementById('charBirthDay');
+            if (!monthSelect || !daySelect) return;
+
+            const valueToRestore = (preserveValue !== undefined && preserveValue !== null && preserveValue !== '')
+                ? String(preserveValue)
+                : daySelect.value;
+
+            const month = parseInt(monthSelect.value, 10);
+            const maxDay = DAYS_IN_MONTH[month] || 31;
+
+            let optionsHtml = '<option value="">-- Day --</option>';
+            for (let d = 1; d <= maxDay; d++) {
+                optionsHtml += `<option value="${d}">${d}</option>`;
+            }
+            daySelect.innerHTML = optionsHtml;
+
+            if (valueToRestore && parseInt(valueToRestore, 10) <= maxDay) {
+                daySelect.value = valueToRestore;
+            }
+        }
+
+        const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
         function updatePreview() {
             const storyName = document.getElementById('charStoryName').value || 'Unnamed';
             const shortDesc = document.getElementById('charShortDesc').value || 'No short description';
@@ -1033,6 +1101,17 @@
 
             document.getElementById('previewStoryName').innerText = storyName;
             document.getElementById('previewShortDesc').innerText = shortDesc;
+
+            // Age / Birthdate preview
+            const ageValue = document.getElementById('charAge')?.value;
+            const birthMonthValue = document.getElementById('charBirthMonth')?.value;
+            const birthDayValue = document.getElementById('charBirthDay')?.value;
+            const agePart = ageValue ? `${ageValue} years old` : '';
+            const birthPart = (birthMonthValue && birthDayValue)
+                ? `Birthday: ${MONTH_NAMES[parseInt(birthMonthValue, 10) - 1]} ${birthDayValue}`
+                : '';
+            const ageBirthText = [agePart, birthPart].filter(Boolean).join(' • ');
+            document.getElementById('previewAgeBirth').innerText = ageBirthText || '—';
 
             // Combine preview text
             let descSnippet = '';
@@ -1294,6 +1373,9 @@
             document.getElementById('charAppearance').value = item.appearance || '';
             document.getElementById('charPersonality').value = item.personality || '';
             document.getElementById('charGenerally').value = item.generally || '';
+            document.getElementById('charAge').value = (item.age !== null && item.age !== undefined) ? item.age : '';
+            document.getElementById('charBirthMonth').value = (item.birthMonth !== null && item.birthMonth !== undefined) ? item.birthMonth : '';
+            updateBirthDayOptions((item.birthDay !== null && item.birthDay !== undefined) ? item.birthDay : '');
             document.getElementById('charAvatar').value = item.avatar || item.coverURL || '';
             document.getElementById('charCoverUrl').value = item.backgroundURL || '';
             const blurPx = (typeof item.backgroundBlurPx === 'number' && Number.isFinite(item.backgroundBlurPx))
@@ -1581,6 +1663,12 @@
             const appearance = document.getElementById('charAppearance').value;
             const personality = document.getElementById('charPersonality').value;
             const generally = document.getElementById('charGenerally').value;
+            const ageRaw = parseInt(document.getElementById('charAge').value, 10);
+            const age = Number.isFinite(ageRaw) ? ageRaw : null;
+            const birthMonthRaw = parseInt(document.getElementById('charBirthMonth').value, 10);
+            const birthMonth = Number.isFinite(birthMonthRaw) ? birthMonthRaw : null;
+            const birthDayRaw = parseInt(document.getElementById('charBirthDay').value, 10);
+            const birthDay = Number.isFinite(birthDayRaw) ? birthDayRaw : null;
             const avatarUrl = document.getElementById('charAvatar').value || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80';
             const coverUrl = document.getElementById('charCoverUrl').value || '';
             const coverBlurPercentRaw = parseFloat(document.getElementById('charCoverBlur')?.value);
@@ -1614,6 +1702,9 @@
                 appearance,
                 personality,
                 generally,
+                age,
+                birthMonth,
+                birthDay,
                 avatar: avatarUrl,
                 coverURL: avatarUrl,
                 backgroundURL: coverUrl,
@@ -1684,6 +1775,7 @@
         // Initial start when loading
         window.addEventListener('DOMContentLoaded', async () => {
             initVoiceSupport();
+            updateBirthDayOptions();
             // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
             await migrateLegacyLocalStorage();
             await initializeForm();
