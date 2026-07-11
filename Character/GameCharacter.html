@@ -21,7 +21,7 @@
     </script>
     <script>
         if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.4.2/dexie.min.js"><\/script>');
         }
     </script>
     <script>
@@ -76,21 +76,22 @@
         let bridgeParentOrigin = null;
 
         function resolveBridgeTargetOrigin(preferredOrigin = null) {
-            if (preferredOrigin) return preferredOrigin;
-            if (bridgeParentOrigin) return bridgeParentOrigin;
+            if (preferredOrigin && isBridgeMessageOriginAllowed(preferredOrigin)) return preferredOrigin;
+            if (bridgeParentOrigin && isBridgeMessageOriginAllowed(bridgeParentOrigin)) return bridgeParentOrigin;
             try {
                 const referrer = document.referrer;
                 if (referrer) {
                     const parsedReferrer = new URL(referrer);
-                    if (parsedReferrer.origin) return parsedReferrer.origin;
+                    if (parsedReferrer.origin && isBridgeMessageOriginAllowed(parsedReferrer.origin)) return parsedReferrer.origin;
                 }
             } catch (_) {}
             try {
                 if (window.location.ancestorOrigins && window.location.ancestorOrigins.length) {
-                    return window.location.ancestorOrigins[0];
+                    const candidate = window.location.ancestorOrigins[0];
+                    if (candidate && isBridgeMessageOriginAllowed(candidate)) return candidate;
                 }
             } catch (_) {}
-            return '*';
+            return window.location.origin;
         }
 
         function safePostBridgeMessage(payload, preferredOrigin = null) {
@@ -100,7 +101,11 @@
             const candidateOrigins = [];
             const resolvedOrigin = resolveBridgeTargetOrigin(preferredOrigin);
             if (resolvedOrigin) candidateOrigins.push(resolvedOrigin);
-            candidateOrigins.push('*');
+            getBridgeMessageOrigins().forEach(origin => {
+                if (origin && origin !== resolvedOrigin && isBridgeMessageOriginAllowed(origin)) {
+                    candidateOrigins.push(origin);
+                }
+            });
 
             for (const target of targets) {
                 for (const origin of candidateOrigins) {
@@ -164,13 +169,12 @@
 
                     window.addEventListener('message', handleMessage);
 
-                    // Use wildcard targetOrigin for parent postMessage to avoid origin-mismatch
                     const sent = safePostBridgeMessage({
                         type: 'AI_REQUEST',
                         requestId: requestId,
                         instruction: instruction,
                         stopSequences: stopSequences
-                    }, '*');
+                    });
 
                     if (!sent) {
                         if (settled) return;
@@ -503,6 +507,46 @@
             font-weight: 700;
             margin-bottom: 10px;
             color: var(--text-main);
+        }
+
+        .npc-info-tabs {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .npc-info-tab {
+            appearance: none;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 8px 12px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .npc-info-tab:hover {
+            color: var(--text-main);
+            border-color: var(--char-color, #6366f1);
+            background: rgba(99, 102, 241, 0.12);
+        }
+
+        .npc-info-tab.active {
+            color: var(--text-main);
+            border-color: var(--char-color, #6366f1);
+            background: rgba(99, 102, 241, 0.18);
+        }
+
+        .npc-info-panels {
+            display: block;
+        }
+
+        .npc-info-panel {
+            display: grid;
+            gap: 16px;
         }
 
         .npc-info-search {
@@ -1444,7 +1488,7 @@
                     </div>
                 </div>
                 <div class="topbar-actions-right">
-                    <button type="button" class="control-btn icon-btn" id="npcInfoBtn" onclick="toggleNpcInfoModal()" title="NPC Memories & Favorites">
+                    <button type="button" class="control-btn icon-btn" id="npcInfoBtn" onclick="toggleNpcInfoModal()" title="Story Settings">
                         <svg viewBox="0 0 24 24">
                             <path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96c-.5-.38-1.04-.7-1.64-.94L14.4 2.5a.5.5 0 0 0-.49-.42h-3.84a.5.5 0 0 0-.49.42l-.36 2.54c-.6.24-1.14.56-1.64.94l-2.39-.96a.5.5 0 0 0-.6.22L2.7 10.74a.5.5 0 0 0 .12.64l2.03 1.58c-.04.3-.06.61-.06.94s.02.64.06.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.38 1.04.7 1.64.94l.36 2.54a.5.5 0 0 0 .49.42h3.84a.5.5 0 0 0 .49-.42l.36-2.54c.6-.24 1.14-.56 1.64-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58zM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7z"/>
                         </svg>
@@ -1461,30 +1505,37 @@
             <div class="npc-info-modal" id="npcInfoModal" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="npcInfoTitle">
                 <div class="npc-info-modal__header">
                     <div>
-                        <div class="npc-info-modal__title" id="npcInfoTitle">NPC Memories & Favorites</div>
-                        <div class="npc-info-modal__subtitle">Saved context information for this character</div>
+                        <div class="npc-info-modal__title" id="npcInfoTitle">Story Settings</div>
+                        <div class="npc-info-modal__subtitle" id="npcInfoSubtitle">Saved context information for this story</div>
                     </div>
                     <button type="button" class="modal-close-btn" onclick="closeNpcInfoModal()" title="Schließen">
                         <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
                     </button>
                 </div>
                 <div class="npc-info-modal__body">
-                    <section class="npc-info-section">
-                        <div class="npc-info-section__title">Memories</div>
-                        <div class="npc-info-search">
-                            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-                            <input type="text" id="npcMemoriesSearchInput" placeholder="Find memories..." oninput="handleNpcMemoriesSearch(this.value)">
+                    <div class="npc-info-tabs">
+                        <button type="button" class="npc-info-tab active" data-category="memories" onclick="setNpcInfoCategory('memories')">Memories</button>
+                    </div>
+                    <div class="npc-info-panels">
+                        <div class="npc-info-panel" data-category="memories">
+                            <section class="npc-info-section">
+                                <div class="npc-info-section__title">Memories</div>
+                                <div class="npc-info-search">
+                                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+                                    <input type="text" id="npcMemoriesSearchInput" placeholder="Find memories..." oninput="handleNpcMemoriesSearch(this.value)">
+                                </div>
+                                <div class="npc-info-list" id="npcMemoriesList"></div>
+                            </section>
+                            <section class="npc-info-section">
+                                <div class="npc-info-section__title">Favorite Messages</div>
+                                <div class="npc-info-search">
+                                    <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
+                                    <input type="text" id="npcFavoritesSearchInput" placeholder="Find favorite messages..." oninput="handleNpcFavoritesSearch(this.value)">
+                                </div>
+                                <div class="npc-info-list" id="npcFavoriteMessagesList"></div>
+                            </section>
                         </div>
-                        <div class="npc-info-list" id="npcMemoriesList"></div>
-                    </section>
-                    <section class="npc-info-section">
-                        <div class="npc-info-section__title">Favorite Messages</div>
-                        <div class="npc-info-search">
-                            <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27a6.5 6.5 0 1 0-.7.7l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0a4.5 4.5 0 1 1 0-9 4.5 4.5 0 0 1 0 9z"/></svg>
-                            <input type="text" id="npcFavoritesSearchInput" placeholder="Find favorite messages..." oninput="handleNpcFavoritesSearch(this.value)">
-                        </div>
-                        <div class="npc-info-list" id="npcFavoriteMessagesList"></div>
-                    </section>
+                    </div>
                 </div>
             </div>
 
@@ -1556,6 +1607,17 @@
             settings: 'id',
             drafts: 'characterId',
             displayVersions: 'characterId'
+        });
+        db.version(2).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId',
+            memoryState: 'characterId'
         });
 
         // --- Persistenter Speicher -----------------------------------------
@@ -1743,6 +1805,7 @@
         let oramaDB = null;
         let oramaInsert = null;
         let oramaSearch = null;
+        let resetMemoryBackend = null;
         let transformerPipeline = null;
 
         // --- Cross-page sync of the "Model not Loaded / Model loaded" status button
@@ -1777,6 +1840,7 @@
         let personas = [];
         let memories = [];
         let favoriteMessages = [];
+        let memoryState = null;
         let selectedPersona = null;
         let personaSearchQuery = '';
         let isPersonaMenuOpen = false;
@@ -1786,6 +1850,16 @@
         let editingMessageId = null;
         let npcMemoriesSearchQuery = '';
         let npcFavoritesSearchQuery = '';
+        let npcInfoActiveCategory = 'memories';
+        let indexedMemoryMessageIds = new Set();
+        let memoryTaskChain = Promise.resolve();
+        let compressionDebounceTimer = null;
+
+        const MEMORY_RETRIEVAL_LIMIT = 5;
+        const MEMORY_QUERY_MESSAGE_COUNT = 2;
+        const MEMORY_WORKING_SET_LIMIT = 18;
+        const MEMORY_COMPRESSION_THRESHOLD = 30;
+        const MEMORY_SUMMARY_CHAR_LIMIT = 2600;
 
         const isMobileChatInput = (() => {
             try {
@@ -1876,34 +1950,30 @@
                     throw new Error('Orama exports are incomplete.');
                 }
 
-                oramaDB = await orama.create({ schema: { role: 'string', content: 'string' } });
-
-                const existingMessages = Array.isArray(chatHistory) ? chatHistory : [];
-                const fallbackHistory = existingMessages.length
-                    ? existingMessages
-                    : await (async () => {
-                        try {
-                            const id = parseInt(currentCharacter?.id ?? new URLSearchParams(window.location.search).get('id'), 10);
-                            if (!Number.isFinite(id)) return [];
-                            const row = await db.table('chatHistory').get(id);
-                            return row && Array.isArray(row.history) ? row.history : [];
-                        } catch (err) {
-                            return [];
+                resetMemoryBackend = async () => {
+                    oramaDB = await orama.create({
+                        schema: {
+                            messageId: 'string',
+                            role: 'string',
+                            sender: 'string',
+                            content: 'string',
+                            characterId: 'number',
+                            timestamp: 'number'
                         }
-                    })();
+                    });
+                    indexedMemoryMessageIds = new Set();
+                };
 
-                for (const msg of Array.isArray(fallbackHistory) ? fallbackHistory : []) {
-                    if (!msg) continue;
-                    const role = msg.role || (msg.sender === 'bot' || msg.sender === 'assistant' ? 'assistant' : 'user');
-                    const content = msg.content || msg.text;
-                    if (!content) continue;
-                    await oramaInsert(oramaDB, { role, content: String(content) });
-                }
+                await resetMemoryBackend();
             } catch (err) {
                 console.warn('Could not initialize Orama:', err);
                 oramaDB = null;
                 oramaInsert = async () => [];
                 oramaSearch = async () => ({ hits: [] });
+                resetMemoryBackend = async () => {
+                    oramaDB = null;
+                    indexedMemoryMessageIds = new Set();
+                };
             }
         }
 
@@ -1959,12 +2029,17 @@
                 };
 
                 // In-memory vector store; drop-in replacement for the Orama handles.
-                const store = [];
-                oramaDB = store;
-
-                oramaInsert = async (db, { role, content }) => {
+                oramaInsert = async (db, { role, content, sender, messageId, characterId, timestamp }) => {
                     const embedding = await embed(String(content));
-                    db.push({ role, content: String(content), embedding });
+                    db.push({
+                        role,
+                        sender: sender || role,
+                        content: String(content),
+                        embedding,
+                        messageId: messageId || '',
+                        characterId: characterId ?? -1,
+                        timestamp: timestamp ?? Date.now()
+                    });
                 };
 
                 oramaSearch = async (db, { term, limit = 3 }) => {
@@ -1976,29 +2051,12 @@
                         .slice(0, limit);
                     return { hits };
                 };
+                resetMemoryBackend = async () => {
+                    oramaDB = [];
+                    indexedMemoryMessageIds = new Set();
+                };
 
-                // Load existing chat history into the vector store, mirroring initOrama().
-                const existingMessages = Array.isArray(chatHistory) ? chatHistory : [];
-                const fallbackHistory = existingMessages.length
-                    ? existingMessages
-                    : await (async () => {
-                        try {
-                            const id = parseInt(currentCharacter?.id ?? new URLSearchParams(window.location.search).get('id'), 10);
-                            if (!Number.isFinite(id)) return [];
-                            const row = await db.table('chatHistory').get(id);
-                            return row && Array.isArray(row.history) ? row.history : [];
-                        } catch (err) {
-                            return [];
-                        }
-                    })();
-
-                for (const msg of Array.isArray(fallbackHistory) ? fallbackHistory : []) {
-                    if (!msg) continue;
-                    const role = msg.role || (msg.sender === 'bot' || msg.sender === 'assistant' ? 'assistant' : 'user');
-                    const content = msg.content || msg.text;
-                    if (!content) continue;
-                    await oramaInsert(oramaDB, { role, content: String(content) });
-                }
+                await resetMemoryBackend();
 
                 reportModelStatus('loaded');
             } catch (err) {
@@ -2007,6 +2065,10 @@
                 oramaDB = null;
                 oramaInsert = async () => [];
                 oramaSearch = async () => ({ hits: [] });
+                resetMemoryBackend = async () => {
+                    oramaDB = null;
+                    indexedMemoryMessageIds = new Set();
+                };
                 const errorName = (() => {
                     try { return err && typeof err === 'object' ? err.name : null; } catch (_) { return null; }
                 })();
@@ -2172,22 +2234,7 @@
                 if (url.startsWith('http://')) return `https://${url.slice('http://'.length)}`;
                 return url;
             };
-
-            const storySourceCharacter = (() => {
-                if (!currentCharacter || currentCharacter.type !== 'story') return null;
-                const candidates = [];
-                if (typeof currentCharacter.characterName === 'string' && currentCharacter.characterName.trim()) {
-                    candidates.push(currentCharacter.characterName.trim());
-                }
-                if (typeof currentCharacter.name === 'string' && currentCharacter.name.trim()) {
-                    candidates.push(currentCharacter.name.replace(/^Story:\s*/i, '').trim());
-                }
-                const wanted = candidates.find(Boolean);
-                if (!wanted) return null;
-                return items.find(i => i && i.type === 'character' && typeof i.name === 'string' && i.name.trim() === wanted) || null;
-            })();
-
-            const coverUrl = normalizeCoverUrl(currentCharacter.backgroundURL) || normalizeCoverUrl(storySourceCharacter?.backgroundURL);
+            const coverUrl = normalizeCoverUrl(currentCharacter.backgroundURL);
             const shouldUseCover = Boolean(coverUrl);
             const backgroundUrl = shouldUseCover ? coverUrl : currentCharacter.avatar;
             const blurPx = (() => {
@@ -2195,11 +2242,6 @@
                     ? currentCharacter.backgroundBlurPx
                     : ((typeof currentCharacter.backgroundBlur === 'number' && Number.isFinite(currentCharacter.backgroundBlur)) ? currentCharacter.backgroundBlur : null);
                 if (fromData !== null) return Math.min(60, Math.max(0, Math.round(fromData)));
-
-                const fromSource = (typeof storySourceCharacter?.backgroundBlurPx === 'number' && Number.isFinite(storySourceCharacter.backgroundBlurPx))
-                    ? storySourceCharacter.backgroundBlurPx
-                    : ((typeof storySourceCharacter?.backgroundBlur === 'number' && Number.isFinite(storySourceCharacter.backgroundBlur)) ? storySourceCharacter.backgroundBlur : null);
-                if (fromSource !== null) return Math.min(60, Math.max(0, Math.round(fromSource)));
 
                 return shouldUseCover ? 15 : 80;
             })();
@@ -2209,8 +2251,19 @@
             document.getElementById('ambientBg').style.backgroundImage = `url('${backgroundUrl}')`;
             document.getElementById('topbarAvatar').style.backgroundImage = `url('${currentCharacter.avatar}')`;
             document.getElementById('topbarName').innerText = currentCharacter.name;
+            const npcInfoBtn = document.getElementById('npcInfoBtn');
+            const npcInfoTitle = document.getElementById('npcInfoTitle');
+            const npcInfoSubtitle = document.getElementById('npcInfoSubtitle');
+            const settingsTitle = currentCharacter.type === 'story' ? 'Story Settings' : 'Character Settings';
+            const settingsSubtitle = currentCharacter.type === 'story'
+                ? 'Saved context information for this story'
+                : 'Saved context information for this character';
+            if (npcInfoBtn) npcInfoBtn.title = settingsTitle;
+            if (npcInfoTitle) npcInfoTitle.innerText = settingsTitle;
+            if (npcInfoSubtitle) npcInfoSubtitle.innerText = settingsSubtitle;
             memories = await loadMemories();
             favoriteMessages = await loadFavoriteMessages();
+            memoryState = await loadMemoryState();
             window.groupDisplayVersion = await loadGroupDisplayVersions(charId);
 
             updatePersonaButton();
@@ -2360,7 +2413,9 @@
                             return msg;
                         });
                     }
-                    syncMemoriesFromChatHistory();
+                    await syncMemoriesFromChatHistory();
+                    await compressChatHistory(chatHistory);
+                    await rebuildMemoryIndexFromChatHistory(chatHistory);
                     refreshRerollGroups();
                     renderChatLog();
                     return;
@@ -2385,6 +2440,58 @@
             return currentCharacter?.id !== null && currentCharacter?.id !== undefined
                 ? parseInt(currentCharacter.id, 10)
                 : null;
+        }
+
+        function getDefaultMemoryState() {
+            return {
+                storySummary: '',
+                sourceMessageCount: 0,
+                updatedAt: 0
+            };
+        }
+
+        async function loadMemoryState() {
+            const id = getMemoryStorageId();
+            if (id === null) return getDefaultMemoryState();
+
+            try {
+                const hasDedicatedStore = db.tables.some(table => table.name === 'memoryState');
+                if (hasDedicatedStore) {
+                    const row = await db.table('memoryState').get(id);
+                    return { ...getDefaultMemoryState(), ...(row?.value || {}) };
+                }
+            } catch (err) {
+                console.warn('Error loading memory state from dedicated store:', err);
+            }
+
+            try {
+                const fallbackRow = await db.table('settings').get(`memoryState_${id}`);
+                return { ...getDefaultMemoryState(), ...(fallbackRow?.value || {}) };
+            } catch (err) {
+                console.warn('Error loading memory state fallback:', err);
+                return getDefaultMemoryState();
+            }
+        }
+
+        async function saveMemoryState() {
+            const id = getMemoryStorageId();
+            if (id === null) return;
+
+            try {
+                const hasDedicatedStore = db.tables.some(table => table.name === 'memoryState');
+                if (hasDedicatedStore) {
+                    await db.table('memoryState').put({ characterId: id, value: memoryState || getDefaultMemoryState() });
+                    return;
+                }
+            } catch (err) {
+                console.warn('Error saving memory state to dedicated store:', err);
+            }
+
+            try {
+                await db.table('settings').put({ id: `memoryState_${id}`, value: memoryState || getDefaultMemoryState() });
+            } catch (err) {
+                console.warn('Error saving memory state fallback:', err);
+            }
         }
 
         async function loadMemories() {
@@ -2494,11 +2601,19 @@
         }
 
         function getFavoriteMessageContext(historyMessages = null) {
-            const contextMessages = Array.isArray(historyMessages) ? historyMessages : chatHistory;
-            return contextMessages
-                .filter(msg => msg && !msg.isLoading && typeof msg.text === 'string' && msg.text.trim())
-                .filter(msg => favoriteMessages.includes(msg.id))
-                .slice(0, 3);
+            const fallbackMessages = getFavoriteMessageEntries();
+            if (!Array.isArray(historyMessages)) {
+                return fallbackMessages.slice(0, MEMORY_RETRIEVAL_LIMIT);
+            }
+
+            const historyIds = new Set(
+                historyMessages
+                    .filter(Boolean)
+                    .map((msg, index) => ensureMessageId(msg, index))
+            );
+
+            const scopedFavorites = fallbackMessages.filter(msg => historyIds.has(msg.id));
+            return (scopedFavorites.length ? scopedFavorites : fallbackMessages).slice(0, MEMORY_RETRIEVAL_LIMIT);
         }
 
         function getFavoriteMessageEntries() {
@@ -2509,6 +2624,24 @@
                     ...msg,
                     id: msg.id || ensureMessageId(msg)
                 }));
+        }
+
+        function applyNpcInfoCategoryUI() {
+            const tabs = Array.from(document.querySelectorAll('.npc-info-tab'));
+            tabs.forEach(tab => {
+                const category = tab.dataset.category;
+                tab.classList.toggle('active', category === npcInfoActiveCategory);
+            });
+            const panels = Array.from(document.querySelectorAll('.npc-info-panel'));
+            panels.forEach(panel => {
+                const category = panel.dataset.category;
+                panel.style.display = category === npcInfoActiveCategory ? 'grid' : 'none';
+            });
+        }
+
+        function setNpcInfoCategory(category) {
+            npcInfoActiveCategory = String(category || 'memories');
+            applyNpcInfoCategoryUI();
         }
 
         function toggleNpcInfoModal() {
@@ -2523,10 +2656,12 @@
                 // Start with a clean, unfiltered view every time the modal is opened.
                 npcMemoriesSearchQuery = '';
                 npcFavoritesSearchQuery = '';
+                npcInfoActiveCategory = 'memories';
                 const memoriesSearchInput = document.getElementById('npcMemoriesSearchInput');
                 const favoritesSearchInput = document.getElementById('npcFavoritesSearchInput');
                 if (memoriesSearchInput) memoriesSearchInput.value = '';
                 if (favoritesSearchInput) favoritesSearchInput.value = '';
+                applyNpcInfoCategoryUI();
                 renderNpcInfoModal();
             }
         }
@@ -2638,6 +2773,7 @@
         }
 
         function renderNpcInfoModal() {
+            applyNpcInfoCategoryUI();
             const memoriesList = document.getElementById('npcMemoriesList');
             const favoritesList = document.getElementById('npcFavoriteMessagesList');
             if (!memoriesList || !favoritesList) return;
@@ -2689,55 +2825,264 @@
                 : `<div class="npc-info-empty">${favoriteQuery ? 'No favorites found.' : 'No favorites marked yet.'}</div>`;
         }
 
-        function getRelevantMemories(historyMessages = null) {
-            if (!memories.length) return [];
+        function normalizeMemoryText(value, maxLength = 220) {
+            const collapsed = String(value ?? '')
+                .replace(/\r\n/g, '\n')
+                .replace(/\n+/g, ' ')
+                .replace(/\s+/g, ' ')
+                .replace(/[*_`]/g, '')
+                .trim();
+            if (!collapsed) return '';
+            return collapsed.length > maxLength ? `${collapsed.slice(0, maxLength - 1).trim()}…` : collapsed;
+        }
 
+        function getVisibleHistoryMessages(historyMessages = null) {
             const contextMessages = Array.isArray(historyMessages) ? historyMessages : chatHistory;
-            const visibleContextMessages = contextMessages.filter(msg => msg && isMessageVisible(msg));
-            const recentActiveMessages = visibleContextMessages
-                .filter(msg => !msg.isLoading && typeof msg.text === 'string' && String(msg.text).trim())
-                .slice(-12);
-
-            const excludedMemoryTexts = new Set(
-                recentActiveMessages.map(msg => String(msg.text || '').trim().toLowerCase())
+            return contextMessages.filter(msg =>
+                msg &&
+                isMessageVisible(msg) &&
+                !msg.isLoading &&
+                typeof msg.text === 'string' &&
+                String(msg.text).trim()
             );
+        }
 
-            const pool = memories.filter(memory => {
-                const text = String(memory?.text || '').trim().toLowerCase();
-                return text && !excludedMemoryTexts.has(text);
-            });
+        function getWorkingMemoryMessages(historyMessages = null) {
+            return getVisibleHistoryMessages(historyMessages).slice(-MEMORY_WORKING_SET_LIMIT);
+        }
 
-            const selectedOlder = [];
-            const remainingPool = [...pool];
+        function buildSpeakerLabel(message, characterName = getCharacterName()) {
+            return message?.sender === 'user' ? 'The User' : characterName;
+        }
 
-            while (selectedOlder.length < 3 && remainingPool.length) {
-                const randomIndex = Math.floor(Math.random() * remainingPool.length);
-                const nextMemory = remainingPool.splice(randomIndex, 1)[0];
-                selectedOlder.push(nextMemory);
+        function buildMemoryDocumentFromMessage(msg, index = 0) {
+            if (!msg || msg.isLoading) return null;
+            const content = normalizeMemoryText(msg.text || msg.content, 1200);
+            if (!content) return null;
+
+            const role = msg.role || (msg.sender === 'bot' || msg.sender === 'assistant' ? 'assistant' : 'user');
+            const sender = msg.sender === 'bot' ? 'assistant' : (msg.sender || role);
+            const messageId = ensureMessageId(msg, index);
+            const storageCharacterId = getMemoryStorageId();
+
+            return {
+                messageId: String(messageId),
+                role,
+                sender,
+                content,
+                characterId: Number.isFinite(storageCharacterId) ? storageCharacterId : -1,
+                timestamp: Number(msg.timestamp) || Date.now()
+            };
+        }
+
+        function enqueueMemoryTask(task) {
+            memoryTaskChain = memoryTaskChain
+                .then(() => task())
+                .catch(err => {
+                    console.warn('Background memory task failed:', err);
+                });
+            return memoryTaskChain;
+        }
+
+        function scheduleBackgroundTask(task, delay = 0) {
+            const runner = () => {
+                enqueueMemoryTask(async () => {
+                    await task();
+                });
+            };
+
+            if (typeof window.requestIdleCallback === 'function') {
+                window.requestIdleCallback(runner, { timeout: 1200 });
+                return;
             }
 
-            const recentUserMessages = recentActiveMessages
-                .filter(msg => msg.sender === 'user');
+            window.setTimeout(runner, delay);
+        }
 
-            const keywordMatches = recentUserMessages.flatMap(userMessage => {
-                const message = String(userMessage?.text || '').toLowerCase();
-                if (!message) return [];
+        async function indexMessageInBackground(msg, index = 0) {
+            const doc = buildMemoryDocumentFromMessage(msg, index);
+            if (!doc || typeof oramaInsert !== 'function' || !oramaDB) return;
+            if (indexedMemoryMessageIds.has(doc.messageId)) return;
 
-                const keywords = ['hast', 'du', 'den', 'stift', 'gesehen'];
-                const matchedKeywords = keywords.filter(keyword => message.includes(keyword));
-                if (!matchedKeywords.length) return [];
+            await oramaInsert(oramaDB, doc);
+            indexedMemoryMessageIds.add(doc.messageId);
+        }
 
-                return memories.filter(memory => {
-                    const text = String(memory?.text || '').toLowerCase();
-                    return !excludedMemoryTexts.has(text) && matchedKeywords.some(keyword => text.includes(keyword));
-                }).slice(0, 3);
+        function queueMessageIndex(msg, index = 0) {
+            const doc = buildMemoryDocumentFromMessage(msg, index);
+            if (!doc || typeof oramaInsert !== 'function' || !oramaDB) return;
+            if (indexedMemoryMessageIds.has(doc.messageId)) return;
+
+            scheduleBackgroundTask(async () => {
+                await indexMessageInBackground(msg, index);
             });
+        }
 
-            const combined = [...selectedOlder, ...keywordMatches].filter((memory, index, self) =>
-                memory && self.findIndex(candidate => candidate.id === memory.id) === index
-            );
+        async function rebuildMemoryIndexFromChatHistory(historyMessages = null) {
+            if (typeof resetMemoryBackend !== 'function' || typeof oramaInsert !== 'function') return;
+            await resetMemoryBackend();
+            if (!oramaDB) return;
 
-            return combined.slice(0, 3);
+            const visibleMessages = getVisibleHistoryMessages(historyMessages);
+            for (let i = 0; i < visibleMessages.length; i++) {
+                const doc = buildMemoryDocumentFromMessage(visibleMessages[i], i);
+                if (!doc) continue;
+                await oramaInsert(oramaDB, doc);
+                indexedMemoryMessageIds.add(doc.messageId);
+            }
+        }
+
+        function scoreSummaryMessage(msg) {
+            const text = normalizeMemoryText(msg?.text || '', 320);
+            if (!text) return 0;
+
+            let score = Math.min(12, Math.ceil(text.length / 30));
+            if (msg.sender === 'user') score += 2;
+            if (favoriteMessages.includes(msg.id)) score += 4;
+            if (/[!?]/.test(text)) score += 1;
+            if (/\b(remember|important|promise|secret|love|hate|family|birthday|age|goal|plan|name)\b/i.test(text)) score += 3;
+            return score;
+        }
+
+        function buildSummaryFromMessages(messages) {
+            if (!Array.isArray(messages) || !messages.length) return '';
+
+            const chunkSize = 6;
+            const summaryLines = [];
+
+            for (let index = 0; index < messages.length; index += chunkSize) {
+                const chunk = messages.slice(index, index + chunkSize);
+                const highlights = [...chunk]
+                    .sort((a, b) => scoreSummaryMessage(b) - scoreSummaryMessage(a))
+                    .slice(0, 2)
+                    .map(msg => `${buildSpeakerLabel(msg)}: ${normalizeMemoryText(msg.text, 140)}`)
+                    .filter(Boolean);
+
+                if (!highlights.length) continue;
+                summaryLines.push(`- ${highlights.join(' | ')}`);
+                if (summaryLines.join('\n').length >= MEMORY_SUMMARY_CHAR_LIMIT) break;
+            }
+
+            return summaryLines.join('\n').slice(0, MEMORY_SUMMARY_CHAR_LIMIT).trim();
+        }
+
+        async function compressChatHistory(historyMessages = chatHistory, { persist = true } = {}) {
+            const visibleMessages = getVisibleHistoryMessages(historyMessages);
+            const olderMessages = visibleMessages.slice(0, Math.max(0, visibleMessages.length - MEMORY_WORKING_SET_LIMIT));
+
+            const nextState = getDefaultMemoryState();
+            if (olderMessages.length >= MEMORY_COMPRESSION_THRESHOLD - MEMORY_WORKING_SET_LIMIT) {
+                nextState.storySummary = buildSummaryFromMessages(olderMessages);
+                nextState.sourceMessageCount = olderMessages.length;
+                nextState.updatedAt = Date.now();
+            }
+
+            if (persist) {
+                memoryState = nextState;
+                await saveMemoryState();
+            }
+
+            return nextState;
+        }
+
+        function scheduleChatCompression() {
+            if (compressionDebounceTimer) {
+                clearTimeout(compressionDebounceTimer);
+            }
+
+            compressionDebounceTimer = window.setTimeout(() => {
+                compressionDebounceTimer = null;
+                scheduleBackgroundTask(async () => {
+                    await compressChatHistory(chatHistory);
+                });
+            }, 180);
+        }
+
+        function resolveMemoryFromSearchHit(hit, allowedMessageIds = null) {
+            const documentData = hit?.document || hit || {};
+            const messageId = documentData.messageId ? String(documentData.messageId) : '';
+            if (allowedMessageIds && messageId && !allowedMessageIds.has(messageId)) return null;
+            const sourceMessage = messageId
+                ? chatHistory.find(msg => msg && String(msg.id) === messageId)
+                : null;
+
+            if (sourceMessage) {
+                if (!isMessageVisible(sourceMessage) || sourceMessage.isLoading) return null;
+                return {
+                    id: sourceMessage.id,
+                    sender: sourceMessage.sender,
+                    text: String(sourceMessage.text || '').trim(),
+                    messageId: sourceMessage.id,
+                    timestamp: sourceMessage.timestamp || documentData.timestamp || Date.now()
+                };
+            }
+
+            const fallbackText = normalizeMemoryText(documentData.content, 1200).toLowerCase();
+            if (!fallbackText) return null;
+
+            const fallbackMemory = memories.find(memory => normalizeMemoryText(memory?.text, 1200).toLowerCase() === fallbackText);
+            return fallbackMemory || null;
+        }
+
+        async function getRelevantMemories(historyMessages = null) {
+            const visibleMessages = getVisibleHistoryMessages(historyMessages);
+            const allowedMessageIds = new Set(visibleMessages.map((msg, index) => String(ensureMessageId(msg, index))));
+            const recentUserMessages = visibleMessages
+                .filter(msg => msg.sender === 'user')
+                .slice(-MEMORY_QUERY_MESSAGE_COUNT);
+
+            const queryText = recentUserMessages
+                .map(msg => normalizeMemoryText(msg.text, 320))
+                .filter(Boolean)
+                .join('\n');
+
+            const recentWorkingMessages = getWorkingMemoryMessages(historyMessages);
+            const excludedMessageIds = new Set(recentWorkingMessages.map(msg => String(msg.id || '')));
+            const excludedTexts = new Set(recentWorkingMessages.map(msg => normalizeMemoryText(msg.text, 1200).toLowerCase()));
+
+            if (queryText && typeof oramaSearch === 'function' && oramaDB) {
+                try {
+                    const searchResults = await oramaSearch(oramaDB, {
+                        term: queryText,
+                        properties: ['content'],
+                        limit: MEMORY_RETRIEVAL_LIMIT + 8,
+                        tolerance: 1
+                    });
+
+                    const selectedMemories = [];
+                    const seenIds = new Set();
+
+                    for (const hit of Array.isArray(searchResults?.hits) ? searchResults.hits : []) {
+                        const memory = resolveMemoryFromSearchHit(hit, allowedMessageIds);
+                        if (!memory) continue;
+
+                        const memoryId = String(memory.messageId || memory.id || '');
+                        const normalizedText = normalizeMemoryText(memory.text, 1200).toLowerCase();
+                        if (!normalizedText) continue;
+                        if ((memoryId && excludedMessageIds.has(memoryId)) || excludedTexts.has(normalizedText)) continue;
+                        if (memoryId && seenIds.has(memoryId)) continue;
+                        if (memoryId) seenIds.add(memoryId);
+
+                        selectedMemories.push(memory);
+                        if (selectedMemories.length >= MEMORY_RETRIEVAL_LIMIT) break;
+                    }
+
+                    if (selectedMemories.length) {
+                        return selectedMemories;
+                    }
+                } catch (err) {
+                    console.warn('Semantic memory search failed:', err);
+                }
+            }
+
+            return memories
+                .filter(memory => {
+                    const memoryId = String(memory?.messageId || memory?.id || '');
+                    const normalizedText = normalizeMemoryText(memory?.text, 1200).toLowerCase();
+                    return normalizedText && !excludedTexts.has(normalizedText) && !excludedMessageIds.has(memoryId);
+                })
+                .sort((a, b) => (b?.timestamp || 0) - (a?.timestamp || 0))
+                .slice(0, MEMORY_RETRIEVAL_LIMIT);
         }
 
         async function initializeIntroductoryChat() {
@@ -2767,6 +3112,8 @@
                 await storeMessageAsMemory(msg);
             }
             await saveChatHistory();
+            await compressChatHistory(chatHistory);
+            await rebuildMemoryIndexFromChatHistory(chatHistory);
             renderChatLog();
         }
 
@@ -2883,7 +3230,9 @@
                 // Memory-Kontext neu aufbauen, damit gelöschte Nachrichten nicht mehr
                 // als "Erinnerung" in zukünftige AI-Prompts einfließen.
                 await syncMemoriesFromChatHistory();
+                await compressChatHistory(chatHistory);
                 await saveChatHistory();
+                await rebuildMemoryIndexFromChatHistory(chatHistory);
                 renderChatLog();
             }
         }
@@ -2900,13 +3249,48 @@
             return resolved ? resolved.trim() : 'Character';
         }
 
-        function buildCharacterPrompt(historyMessages = [], { mode = 'reply' } = {}) {
+        function getPermanentIdentityFacts(characterName) {
+            const lines = [];
+
+            lines.push(`Character Name: ${characterName}`);
+            if (currentCharacter?.storyName && currentCharacter.storyName.trim() && currentCharacter.storyName.trim() !== characterName) {
+                lines.push(`Story Name: ${currentCharacter.storyName.trim()}`);
+            }
+
+            const characterAge = Number.isFinite(currentCharacter?.age) ? currentCharacter.age : parseInt(currentCharacter?.age, 10);
+            if (Number.isFinite(characterAge)) lines.push(`Age: ${characterAge} years old`);
+
+            const birthMonthNum = parseInt(currentCharacter?.birthMonth, 10);
+            const birthDayNum = parseInt(currentCharacter?.birthDay, 10);
+            if (Number.isFinite(birthMonthNum) && birthMonthNum >= 1 && birthMonthNum <= 12 && Number.isFinite(birthDayNum)) {
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                lines.push(`Birthday: ${monthNames[birthMonthNum - 1]} ${birthDayNum}`);
+            }
+
+            if (currentCharacter?.generally) lines.push(`General Character Traits: ${currentCharacter.generally}`);
+            if (currentCharacter?.appearance) lines.push(`Appearance: ${currentCharacter.appearance}`);
+            if (currentCharacter?.personality) lines.push(`Personality: ${currentCharacter.personality}`);
+            if (currentCharacter?.description) lines.push(`Description: ${currentCharacter.description}`);
+            if (Array.isArray(currentCharacter?.secrets) && currentCharacter.secrets.length) {
+                lines.push(`Secrets: ${currentCharacter.secrets.filter(Boolean).join('; ')}`);
+            }
+
+            if (selectedPersona) {
+                lines.push(`Active Persona: ${selectedPersona.name}`);
+                if (selectedPersona.generally) lines.push(`Persona Traits: ${selectedPersona.generally}`);
+                if (selectedPersona.appearance) lines.push(`Persona Appearance: ${selectedPersona.appearance}`);
+            }
+
+            return lines;
+        }
+
+        async function buildCharacterPrompt(historyMessages = [], { mode = 'reply' } = {}) {
             const characterName = getCharacterName();
-            const contextLimit = 12;
             const history = Array.isArray(historyMessages) ? historyMessages : chatHistory;
-            const recentHistory = history.filter(msg => !msg.isLoading).slice(-contextLimit);
-            const memoryContext = getRelevantMemories(history);
+            const workingMemory = getWorkingMemoryMessages(history);
+            const memoryContext = await getRelevantMemories(history);
             const favoriteMessageContext = getFavoriteMessageContext(history);
+            const summaryState = await compressChatHistory(history, { persist: history === chatHistory });
 
             const textSizeInstruction = settings.textSize === 'Short'
                 ? 'Keep replies short and concise.'
@@ -2922,76 +3306,55 @@
                         : 'Answer in English.';
 
             const lines = [];
-            lines.push(`You are ${characterName}.`);
-            lines.push(`Character Name: ${characterName}`);
-            if (currentCharacter?.storyName && currentCharacter.storyName.trim() && currentCharacter.storyName.trim() !== characterName) {
-                lines.push(`Story Name: ${currentCharacter.storyName.trim()}`);
-            }
-            const characterAge = Number.isFinite(currentCharacter?.age) ? currentCharacter.age : parseInt(currentCharacter?.age, 10);
-            if (Number.isFinite(characterAge)) lines.push(`Age: ${characterAge} years old`);
-            const birthMonthNum = parseInt(currentCharacter?.birthMonth, 10);
-            const birthDayNum = parseInt(currentCharacter?.birthDay, 10);
-            if (Number.isFinite(birthMonthNum) && birthMonthNum >= 1 && birthMonthNum <= 12 && Number.isFinite(birthDayNum)) {
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                lines.push(`Birthday: ${monthNames[birthMonthNum - 1]} ${birthDayNum}`);
-            }
-            if (currentCharacter?.generally) lines.push(`General Character Traits: ${currentCharacter.generally}`);
-            if (currentCharacter?.appearance) lines.push(`Appearance: ${currentCharacter.appearance}`);
-            if (currentCharacter?.personality) lines.push(`Personality: ${currentCharacter.personality}`);
-            if (currentCharacter?.description) lines.push(`Description: ${currentCharacter.description}`);
-            if (Array.isArray(currentCharacter?.secrets) && currentCharacter.secrets.length) {
-                lines.push(`Secrets: ${currentCharacter.secrets.filter(Boolean).join('; ')}`);
-            }
-            if (selectedPersona) {
-                lines.push(`Active Persona: ${selectedPersona.name}`);
-                if (selectedPersona.generally) lines.push(`Persona Traits: ${selectedPersona.generally}`);
-                if (selectedPersona.appearance) lines.push(`Persona Appearance: ${selectedPersona.appearance}`);
-            }
-
-            if (memoryContext.length) {
-                lines.push('Character Memory:');
-                memoryContext.forEach(memory => {
-                    const senderLabel = memory.sender === 'user' ? 'The User' : characterName;
-                    lines.push(`- ${senderLabel}: ${memory.text}`);
-                });
-            }
-
-            if (favoriteMessageContext.length) {
-                lines.push('Favorite Messages:');
-                favoriteMessageContext.forEach(message => {
-                    const senderLabel = message.sender === 'user' ? 'The User' : characterName;
-                    lines.push(`- ${senderLabel}: ${message.text}`);
-                });
-            }
-
-            lines.push('Conversation Rules: Stay fully in character at all times, speak naturally, and never break the fourth wall.');
+            lines.push(`[System Prompt]`);
+            lines.push(`You are ${characterName}. Stay fully in character at all times and never break the fourth wall.`);
             lines.push(`If The User addresses you directly, respond as ${characterName}.`);
-            lines.push('When the conversation context mentions the player, label them as "The User".');
             lines.push('Use vivid, immersive prose and keep the reply emotionally grounded.');
             lines.push('Wrap spoken dialogue in double quotes. Use asterisks only for actions or expressions. Do not keep the asterisks in the final rendered text.');
             lines.push(`Response Style: ${languageInstruction} ${textSizeInstruction}`);
 
             if (mode === 'intro') {
-                lines.push(`Write an introductory greeting that feels like the first meeting with ${characterName}.`);
+                lines.push(`Task: Write an introductory greeting that feels like the first meeting with ${characterName}.`);
             } else if (mode === 'reroll') {
-                lines.push(`Generate a fresh alternative reply as ${characterName}.`);
+                lines.push(`Task: Generate a fresh alternative reply as ${characterName}, while remaining consistent with the established memory.`);
             } else {
-                lines.push(`Answer the latest message from The User as ${characterName}.`);
+                lines.push(`Task: Answer the latest message from The User as ${characterName}.`);
             }
 
             lines.push('');
-            recentHistory.forEach(msg => {
-                if (msg.sender === 'user') {
-                    lines.push(`The User: ${msg.text}`);
-                } else {
-                    lines.push(`${characterName}: ${msg.text}`);
-                }
+            lines.push(`[Level 1: Core Facts & Favorites]`);
+            getPermanentIdentityFacts(characterName).forEach(line => lines.push(`- ${line}`));
+            if (favoriteMessageContext.length) {
+                lines.push('Pinned Favorite Messages:');
+                favoriteMessageContext.forEach(message => {
+                    lines.push(`- ${buildSpeakerLabel(message, characterName)}: ${normalizeMemoryText(message.text, 180)}`);
+                });
+            }
+
+            if (memoryContext.length) {
+                lines.push('');
+                lines.push(`[Level 2: Semantic Long-Term Memory]`);
+                memoryContext.forEach(memory => {
+                    lines.push(`- ${buildSpeakerLabel(memory, characterName)}: ${normalizeMemoryText(memory.text, 180)}`);
+                });
+            }
+
+            if (summaryState?.storySummary) {
+                lines.push('');
+                lines.push(`[Level 3: Story Summary]`);
+                lines.push(summaryState.storySummary);
+            }
+
+            lines.push('');
+            lines.push(`[Level 4: Working Memory]`);
+            workingMemory.forEach(msg => {
+                lines.push(`${buildSpeakerLabel(msg, characterName)}: ${normalizeMemoryText(msg.text, 1200)}`);
             });
             lines.push(`${characterName}:`);
             return lines.join('\n');
         }
 
-        function buildAIPromptForReroll(targetMessage = null) {
+        async function buildAIPromptForReroll(targetMessage = null) {
             const history = Array.isArray(chatHistory) ? chatHistory : [];
             let targetIndex = -1;
 
@@ -3004,7 +3367,7 @@
             }
 
             const historyBeforeTarget = history.slice(0, targetIndex).filter(msg => !msg.isLoading);
-            return buildCharacterPrompt(historyBeforeTarget, { mode: 'reroll' });
+            return await buildCharacterPrompt(historyBeforeTarget, { mode: 'reroll' });
         }
 
         function getLastVisibleBotMessage() {
@@ -3080,45 +3443,28 @@
                 });
                 saveMemories();
 
-                let prompt = buildAIPromptForReroll(lastBot);
+                let prompt = await buildAIPromptForReroll(lastBot);
                 prompt = await injectOramaContext(prompt);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
                 const normalizedResponse = String(responseText || '').trim();
                 if (!normalizedResponse) {
                     throw new Error('Verbindung zum KI-Server blockiert');
                 }
-                try {
-                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
-                } catch (e) { /* ignore */ }
-                const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
-
-                if (pendingIndex !== -1) {
-                    chatHistory[pendingIndex] = {
-                        ...pendingMessage,
-                        text: normalizedResponse,
-                        isLoading: false
-                    };
-                    storeMessageAsMemory(chatHistory[pendingIndex]);
-                }
+                await finalizePendingBotMessage(pendingMessage, normalizedResponse);
 
                 refreshRerollGroups();
                 setGroupDisplayVersion(groupId, nextVersionNumber);
-                saveChatHistory();
+                await syncMemoriesFromChatHistory();
+                await saveChatHistory();
                 renderChatLog();
             } catch (error) {
                 console.error('AI Error:', error);
                 const friendlyMessage = getFriendlyAiErrorMessage(error);
-                const pendingIndex = chatHistory.findIndex(msg => msg === pendingMessage);
-                if (pendingIndex !== -1) {
-                    chatHistory[pendingIndex] = {
-                        ...pendingMessage,
-                        text: friendlyMessage,
-                        isLoading: false
-                    };
-                }
+                await finalizePendingBotMessage(pendingMessage, friendlyMessage);
                 refreshRerollGroups();
                 setGroupDisplayVersion(groupId, nextVersionNumber);
-                saveChatHistory();
+                await syncMemoriesFromChatHistory();
+                await saveChatHistory();
                 renderChatLog();
                 if (friendlyMessage !== 'Verbindung zum KI-Server blockiert') {
                     alert(`AI Generation Error: ${error.message}`);
@@ -3128,7 +3474,7 @@
             }
         }
 
-        function navigateRerollVersion(groupId, direction) {
+        async function navigateRerollVersion(groupId, direction) {
             const versions = chatHistory
                 .filter(msg => msg.rerollGroupId === groupId)
                 .sort((a, b) => a.versionNumber - b.versionNumber);
@@ -3139,7 +3485,7 @@
             if (next < 1) next = 1;
             if (next > versions.length) next = versions.length;
             setGroupDisplayVersion(groupId, next);
-            syncMemoriesFromChatHistory();
+            await syncMemoriesFromChatHistory();
             renderChatLog();
         }
 
@@ -3235,6 +3581,7 @@
             chatHistory[idx] = { ...chatHistory[idx], text: nextText };
             await saveChatHistory();
             await syncMemoriesFromChatHistory();
+            await rebuildMemoryIndexFromChatHistory(chatHistory);
             closeEditMessageModal();
         }
 
@@ -3398,42 +3745,11 @@
             logArea.scrollTop = logArea.scrollHeight;
         }
 
-        function buildAIPrompt() {
-            return buildCharacterPrompt(chatHistory, { mode: 'reply' });
+        async function buildAIPrompt() {
+            return await buildCharacterPrompt(chatHistory, { mode: 'reply' });
         }
 
         async function injectOramaContext(basePrompt) {
-            if (typeof oramaSearch !== 'function' || !oramaDB) return basePrompt;
-
-            const userMessages = chatHistory.filter(m => m && m.sender === 'user');
-            if (userMessages.length === 0) return basePrompt;
-
-            const lastUserText = userMessages[userMessages.length - 1].text;
-            const recentVisibleMessages = chatHistory.filter(msg => msg && isMessageVisible(msg)).slice(-12);
-            const recentVisibleTextKeys = new Set(
-                recentVisibleMessages
-                    .map(msg => String(msg?.text || '').trim().toLowerCase())
-                    .filter(Boolean)
-            );
-
-            try {
-                const searchResults = await oramaSearch(oramaDB, { term: lastUserText, properties: ['content'], limit: 3, tolerance: 1 });
-                const hits = Array.isArray(searchResults?.hits) ? searchResults.hits : [];
-
-                if (hits.length > 0) {
-                    let memoryContext = '\n[Wichtige Erinnerungen an frühere Ereignisse im Chat]:\n';
-                    const memoryEntries = hits
-                        .map(hit => hit?.document?.content || hit?.content || '')
-                        .filter(Boolean)
-                        .filter(entry => !recentVisibleTextKeys.has(String(entry).trim().toLowerCase()))
-                        .slice(0, 3);
-                    if (memoryEntries.length) {
-                        memoryContext += memoryEntries.map(entry => `- ${entry}`).join('\n');
-                        return `${memoryContext}\n\n${basePrompt}`;
-                    }
-                }
-            } catch (e) { /* ignore search errors */ }
-
             return basePrompt;
         }
 
@@ -3441,25 +3757,22 @@
             if (isWaitingForAI) return;
             if (isEditingAiMessage) return;
 
-            const pendingMsg = addPendingBotMessage();
+            const pendingMsg = await addPendingBotMessage();
             setLoadingState(true);
 
             try {
-                let prompt = buildAIPrompt();
+                let prompt = await buildAIPrompt();
                 prompt = await injectOramaContext(prompt);
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:', '\nThe User:']);
                 const normalizedResponse = String(responseText || '').trim();
                 if (!normalizedResponse) {
                     throw new Error('Verbindung zum KI-Server blockiert');
                 }
-                try {
-                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
-                } catch (e) { /* ignore */ }
-                finalizePendingBotMessage(pendingMsg, normalizedResponse);
+                await finalizePendingBotMessage(pendingMsg, normalizedResponse);
             } catch (error) {
                 console.error('AI Error:', error);
                 const friendlyMessage = getFriendlyAiErrorMessage(error);
-                finalizePendingBotMessage(pendingMsg, friendlyMessage);
+                await finalizePendingBotMessage(pendingMsg, friendlyMessage);
                 if (friendlyMessage !== 'Verbindung zum KI-Server blockiert') {
                     alert(`AI Generation Error: ${error.message}`);
                 }
@@ -3497,13 +3810,16 @@
             };
             await storeMessageAsMemory(chatHistory[targetIndex]);
             await saveChatHistory();
+            queueMessageIndex(chatHistory[targetIndex], targetIndex);
+            scheduleChatCompression();
             renderChatLog();
         }
 
         async function generateInitialGreeting() {
             setLoadingState(true);
-            const pendingMsg = addPendingBotMessage();
-            const prompt = buildCharacterPrompt(chatHistory, { mode: 'intro' });
+            const pendingMsg = await addPendingBotMessage();
+            const prompt = await buildCharacterPrompt(chatHistory, { mode: 'intro' });
+            const introGroupId = `${currentCharacter.id}_intro`;
 
             try {
                 const responseText = await perchanceBridge.generateText(prompt, ['The User:']);
@@ -3512,26 +3828,36 @@
                     throw new Error('Verbindung zum KI-Server blockiert');
                 }
                 
-                finalizePendingBotMessage(pendingMsg, normalizedResponse);
-                chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
+                await finalizePendingBotMessage(pendingMsg, normalizedResponse);
+                chatHistory = chatHistory.map(msg => msg && msg.id === pendingMsg.id ? {
                     ...msg,
                     text: normalizedResponse,
                     isLoading: false,
+                    rerollGroupId: introGroupId,
+                    versionNumber: 1,
+                    versionCount: 1,
                     isIntro: true
                 } : msg);
                 await saveChatHistory();
+                await syncMemoriesFromChatHistory();
+                await rebuildMemoryIndexFromChatHistory(chatHistory);
                 renderChatLog();
             } catch (error) {
                 console.error("AI Error:", error);
                 const friendlyMessage = getFriendlyAiErrorMessage(error);
-                finalizePendingBotMessage(pendingMsg, friendlyMessage);
-                chatHistory = chatHistory.map(msg => msg === pendingMsg ? {
+                await finalizePendingBotMessage(pendingMsg, friendlyMessage);
+                chatHistory = chatHistory.map(msg => msg && msg.id === pendingMsg.id ? {
                     ...msg,
                     text: friendlyMessage,
                     isLoading: false,
+                    rerollGroupId: introGroupId,
+                    versionNumber: 1,
+                    versionCount: 1,
                     isIntro: true
                 } : msg);
                 await saveChatHistory();
+                await syncMemoriesFromChatHistory();
+                await rebuildMemoryIndexFromChatHistory(chatHistory);
                 renderChatLog();
             } finally {
                 setLoadingState(false);
@@ -3556,6 +3882,8 @@
             ensureMessageId(userMessage, chatHistory.length);
             chatHistory.push(userMessage);
             await storeMessageAsMemory(userMessage);
+            queueMessageIndex(userMessage, chatHistory.length - 1);
+            scheduleChatCompression();
 
             await removeDraft();
             inputEl.value = '';
@@ -3567,46 +3895,18 @@
             setLoadingState(true);
 
             try {
-                if (typeof oramaInsert === 'function' && oramaDB) {
-                    try { await oramaInsert(oramaDB, { role: 'user', content: text }); } catch (e) { /* ignore */ }
-                }
-
-                let instruction = buildAIPrompt();
-                if (typeof oramaSearch === 'function' && oramaDB) {
-                    try {
-                        const searchResults = await oramaSearch(oramaDB, { term: text, properties: ['content'], limit: 3, tolerance: 1 });
-                        const hits = Array.isArray(searchResults?.hits) ? searchResults.hits : [];
-                        if (hits.length > 0) {
-                            let memoryContext = '\n[Wichtige Erinnerungen an frühere Ereignisse im Chat]:\n';
-                            const memoryEntries = hits
-                                .map(hit => hit?.document?.content || hit?.content || '')
-                                .filter(Boolean)
-                                .slice(0, 3);
-                            if (memoryEntries.length) {
-                                memoryContext += memoryEntries.map(entry => `- ${entry}`).join('\n');
-                                instruction = `${memoryContext}\n\n${instruction}`;
-                            }
-                        }
-                    } catch (e) {
-                        // search failed, continue without memories
-                    }
-                }
-
+                const instruction = await buildAIPrompt();
                 const aiResponse = await perchanceBridge.generateText(instruction, ['User:', '\nUser:']);
                 const normalizedResponse = String(aiResponse || '').trim();
                 if (!normalizedResponse) {
                     throw new Error('Verbindung zum KI-Server blockiert');
                 }
 
-                try {
-                    if (typeof oramaInsert === 'function' && oramaDB) await oramaInsert(oramaDB, { role: 'assistant', content: normalizedResponse });
-                } catch (e) { /* ignore */ }
-
-                finalizePendingBotMessage(pendingMsg, normalizedResponse);
+                await finalizePendingBotMessage(pendingMsg, normalizedResponse);
             } catch (error) {
                 console.error("AI Error:", error);
                 const friendlyMessage = getFriendlyAiErrorMessage(error);
-                finalizePendingBotMessage(pendingMsg, friendlyMessage);
+                await finalizePendingBotMessage(pendingMsg, friendlyMessage);
                 if (friendlyMessage !== 'Verbindung zum KI-Server blockiert') {
                     alert(`AI Generation Error: ${error.message}`);
                 }
@@ -3644,10 +3944,14 @@
                     console.warn('Error clearing chat history:', err);
                 }
                 chatHistory = [];
+                memories = [];
+                memoryState = getDefaultMemoryState();
+                await saveMemories();
+                await saveMemoryState();
                 renderChatLog();
                 // Reinitialize the active memory backend so it is reset as well
                 try { await initMemorySystem(); } catch (e) { /* ignore */ }
-                generateInitialGreeting();
+                await generateInitialGreeting();
             }
         }
 
