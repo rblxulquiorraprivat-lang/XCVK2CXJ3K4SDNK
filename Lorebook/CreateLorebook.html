@@ -1,0 +1,1137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Story AI - Lorebook Editor</title>
+    <script src="../libs/dexie.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+
+        /* Gleiche Farbpalette wie im Dashboard (index.html), damit sich der
+           Lorebook-Editor wie ein Teil derselben App anfühlt statt wie ein
+           separates Tool mit eigenem Look. */
+        :root {
+            --bg-main: #09090b;
+            --bg-sidebar: #121214;
+            --bg-card: #1c1c1f;
+            --bg-accent: #27272a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: rgba(255, 255, 255, 0.08);
+            --color-primary: #6366f1;
+            --color-success: #10b981;
+            --color-warning: #f59e0b;
+            --color-danger: #ef4444;
+            --transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            background-color: var(--bg-main);
+            color: var(--text-main);
+            min-height: 100vh;
+            background-image:
+                radial-gradient(circle at 15% 0%, rgba(99, 102, 241, 0.05), transparent 25%),
+                radial-gradient(circle at 85% 20%, rgba(139, 92, 246, 0.05), transparent 25%);
+        }
+
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 999px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+        .top-navbar {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: rgba(19, 21, 32, 0.92);
+            border-bottom: 1px solid var(--border-color);
+            backdrop-filter: blur(12px);
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 14px;
+        }
+
+        .back-link {
+            color: #fff;
+            text-decoration: none;
+            font-weight: 800;
+            font-size: 0.92rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid var(--border-color);
+            padding: 8px 14px;
+            border-radius: 999px;
+            transition: var(--transition);
+        }
+
+        .back-link:hover {
+            background: #fff;
+            color: #000;
+            transform: translateX(-2px);
+        }
+
+        .nav-title {
+            font-size: 1.05rem;
+            font-weight: 800;
+            letter-spacing: 0.4px;
+        }
+
+        .nav-count-pill {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            padding: 7px 13px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .page {
+            max-width: 1180px;
+            margin: 26px auto 60px;
+            padding: 0 18px;
+            display: grid;
+            grid-template-columns: 1.35fr 1fr;
+            gap: 18px;
+            align-items: start;
+        }
+
+        .col {
+            display: grid;
+            gap: 18px;
+        }
+
+        .panel {
+            background: var(--bg-sidebar);
+            border: 1px solid var(--border-color);
+            border-radius: 22px;
+            padding: 22px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+        }
+
+        .panel h2 {
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-bottom: 6px;
+        }
+
+        .panel h3 {
+            font-size: 1rem;
+            font-weight: 800;
+        }
+
+        .panel > p.hint {
+            color: var(--text-muted);
+            font-size: 0.88rem;
+            margin-bottom: 18px;
+            line-height: 1.5;
+        }
+
+        .section-divider {
+            border: none;
+            border-top: 1px solid var(--border-color);
+            margin: 20px 0;
+        }
+
+        .form-group {
+            margin-bottom: 14px;
+        }
+
+        .form-label {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 8px;
+            font-weight: 800;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .form-label .optional-tag {
+            font-weight: 400;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+
+        .form-control {
+            width: 100%;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-main);
+            padding: 12px 12px;
+            border-radius: 14px;
+            outline: none;
+            transition: var(--transition);
+            font-size: 0.94rem;
+        }
+
+        .form-control:focus {
+            border-color: rgba(99, 102, 241, 0.7);
+            background: rgba(255,255,255,0.06);
+        }
+
+        .form-control.has-error {
+            border-color: rgba(239, 68, 68, 0.6);
+        }
+
+        input[type="color"].form-control {
+            padding: 4px;
+            height: 46px;
+            cursor: pointer;
+        }
+
+        textarea.form-control {
+            min-height: 90px;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        .char-counter {
+            text-align: right;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .avatar-row {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .avatar-thumb {
+            flex: none;
+            width: 52px;
+            height: 52px;
+            border-radius: 14px;
+            background-size: cover;
+            background-position: center;
+            background-color: rgba(255,255,255,0.05);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn {
+            appearance: none;
+            border: 0;
+            border-radius: 14px;
+            padding: 12px 14px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
+            background: var(--color-primary);
+            color: #fff;
+        }
+
+        .btn-primary:hover {
+            filter: brightness(1.06);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary {
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: #fff;
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255,255,255,0.08);
+            transform: translateY(-1px);
+        }
+
+        .btn-danger {
+            background: rgba(239, 68, 68, 0.14);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            color: #fecaca;
+        }
+
+        .btn-danger:hover {
+            background: rgba(239, 68, 68, 0.2);
+            transform: translateY(-1px);
+        }
+
+        .btn-ghost {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-muted);
+        }
+
+        .btn-ghost:hover {
+            color: #fff;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .toggle-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .toggle-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 13px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            cursor: pointer;
+            user-select: none;
+            transition: var(--transition);
+        }
+
+        .toggle-chip input {
+            accent-color: var(--color-primary);
+            width: 15px;
+            height: 15px;
+            cursor: pointer;
+        }
+
+        .toggle-chip.active {
+            color: #fff;
+            border-color: rgba(99, 102, 241, 0.5);
+            background: rgba(99, 102, 241, 0.14);
+        }
+
+        .entry-form-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .editing-banner {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: rgba(99, 102, 241, 0.12);
+            border: 1px solid rgba(99, 102, 241, 0.35);
+            color: #c7d2fe;
+            font-size: 0.82rem;
+            font-weight: 700;
+            padding: 9px 13px;
+            border-radius: 12px;
+            margin-bottom: 14px;
+        }
+
+        .editing-banner.visible {
+            display: flex;
+        }
+
+        .editing-banner button {
+            background: transparent;
+            border: none;
+            color: #c7d2fe;
+            font-weight: 800;
+            cursor: pointer;
+            text-decoration: underline;
+            font-size: 0.8rem;
+        }
+
+        .entry-form-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .save-row {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 18px;
+            gap: 10px;
+        }
+
+        /* --- Live preview card (mirrors the library card look) --- */
+        .preview-card {
+            border-radius: 18px;
+            overflow: hidden;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+        }
+
+        .preview-cover {
+            height: 110px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            position: relative;
+            background-image:
+                radial-gradient(circle at 28% 24%, rgba(99, 102, 241, 0.25), transparent 60%),
+                radial-gradient(circle at 80% 85%, rgba(99, 102, 241, 0.15), transparent 55%),
+                repeating-linear-gradient(135deg, rgba(255,255,255,0.03) 0px, rgba(255,255,255,0.03) 1px, transparent 1px, transparent 13px);
+        }
+
+        .preview-cover-icon {
+            width: 30px;
+            height: 30px;
+            stroke: var(--color-primary);
+            opacity: 0.9;
+        }
+
+        .preview-cover-count {
+            font-size: 0.68rem;
+            font-weight: 700;
+            letter-spacing: 0.4px;
+            text-transform: uppercase;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        .preview-body {
+            padding: 14px 16px 16px;
+        }
+
+        .preview-name {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 800;
+            font-size: 1.02rem;
+            margin-bottom: 4px;
+        }
+
+        .preview-color-dot {
+            width: 9px;
+            height: 9px;
+            border-radius: 50%;
+            flex: none;
+        }
+
+        .preview-subtitle {
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .preview-desc {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            line-height: 1.5;
+        }
+
+        /* --- Entries panel --- */
+        .entries-toolbar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .entries-toolbar .form-control {
+            padding: 9px 12px;
+        }
+
+        .count-pill {
+            font-size: 0.78rem;
+            font-weight: 800;
+            color: var(--text-muted);
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(255,255,255,0.04);
+            padding: 5px 10px;
+            border-radius: 999px;
+            white-space: nowrap;
+        }
+
+        .entries-list {
+            display: grid;
+            gap: 12px;
+            max-height: 560px;
+            overflow-y: auto;
+            padding-right: 4px;
+            margin-right: -4px;
+        }
+
+        .entry-card {
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 16px;
+            padding: 14px 14px;
+            display: grid;
+            gap: 10px;
+            transition: var(--transition);
+        }
+
+        .entry-card.is-editing {
+            border-color: rgba(99, 102, 241, 0.55);
+            background: rgba(99, 102, 241, 0.08);
+        }
+
+        .entry-card.is-disabled {
+            opacity: 0.55;
+        }
+
+        .entry-card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .entry-card-title {
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .entry-card h4 {
+            font-size: 0.95rem;
+            font-weight: 800;
+        }
+
+        .badge {
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.3px;
+            text-transform: uppercase;
+            padding: 3px 8px;
+            border-radius: 999px;
+        }
+
+        .badge-pinned {
+            background: rgba(245, 158, 11, 0.16);
+            color: #fbbf24;
+            border: 1px solid rgba(245, 158, 11, 0.35);
+        }
+
+        .badge-disabled {
+            background: rgba(239, 68, 68, 0.12);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .entry-card p {
+            margin: 0;
+            color: #cbd5e1;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        .entry-card p.empty-desc {
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        .tag-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            padding: 5px 9px;
+            border-radius: 999px;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.04);
+            color: var(--text-muted);
+        }
+
+        .entry-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .entry-actions .btn {
+            padding: 8px 12px;
+            font-size: 0.82rem;
+        }
+
+        .empty {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            padding: 22px 4px;
+            text-align: center;
+            border: 1px dashed rgba(255,255,255,0.1);
+            border-radius: 14px;
+        }
+
+        .info-note {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+            margin-top: 14px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 900px) {
+            .page {
+                grid-template-columns: 1fr;
+            }
+            .entries-list {
+                max-height: none;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="top-navbar">
+        <a class="back-link" href="../index.html">
+            <svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+            Back to Library
+        </a>
+        <div class="nav-title" id="navTitle">Create Lorebook</div>
+        <div class="nav-count-pill" id="navEntryCount">0 entries</div>
+    </div>
+
+    <div class="page">
+        <div class="col">
+            <div class="panel">
+                <h2 id="pageTitle">Create New Lorebook</h2>
+                <p class="hint">A lorebook is a knowledge base of names, places, rules and other facts for your stories. Fill in the basics below, then add as many entries as you like on the right.</p>
+
+                <form id="lorebookForm" onsubmit="handleSave(event)">
+                    <div class="form-group">
+                        <label class="form-label" for="lorebookName">Lorebook Name</label>
+                        <input type="text" id="lorebookName" class="form-control" placeholder="e.g., The Kingdom of Aetheria" oninput="clearFieldError('lorebookName'); updateLivePreview();" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label" for="lorebookDescription">Short Description <span class="optional-tag">shown on the library card</span></label>
+                        <textarea id="lorebookDescription" class="form-control" style="min-height:70px;" maxlength="220" placeholder="A one or two sentence summary of what this lorebook covers…" oninput="updateLivePreview(); updateCounter('lorebookDescription','lorebookDescCounter',220);"></textarea>
+                        <div class="char-counter"><span id="lorebookDescCounter">0</span>/220 — leave empty to auto-generate from your entry names</div>
+                    </div>
+
+                    <hr class="section-divider">
+
+                    <div class="entry-form-header">
+                        <h3 id="entryFormTitle">Add Entry</h3>
+                    </div>
+                    <div class="editing-banner" id="editingBanner">
+                        <span>✏️ Editing "<span id="editingEntryName"></span>" — changes replace this entry.</span>
+                        <button type="button" onclick="cancelEditEntry()">Cancel edit</button>
+                    </div>
+
+                    <div class="form-group">
+                        <div class="row">
+                            <input type="text" id="entryName" class="form-control" placeholder="Entry Name (e.g., The Skyforge)" oninput="clearFieldError('entryName')">
+                            <input type="text" id="entryTags" class="form-control" placeholder="Keywords (comma separated)">
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <textarea id="entryDescription" class="form-control" maxlength="2000" placeholder="Entry Description" oninput="updateCounter('entryDescription','entryDescCounter',2000)"></textarea>
+                        <div class="char-counter"><span id="entryDescCounter">0</span>/2000</div>
+                    </div>
+
+                    <div class="toggle-row">
+                        <label class="toggle-chip" id="entryPinnedChip">
+                            <input type="checkbox" id="entryPinned" onchange="syncToggleChip('entryPinned','entryPinnedChip')">
+                            📌 Pin to top
+                        </label>
+                        <label class="toggle-chip active" id="entryEnabledChip">
+                            <input type="checkbox" id="entryEnabled" checked onchange="syncToggleChip('entryEnabled','entryEnabledChip')">
+                            👁️ Enabled
+                        </label>
+                    </div>
+
+                    <div class="entry-form-actions">
+                        <button type="button" class="btn btn-primary" id="addEntryBtn" onclick="addOrUpdateEntry()">+ Add Entry</button>
+                        <button type="button" class="btn btn-secondary" onclick="clearEntryForm()">Clear</button>
+                    </div>
+
+                    <div class="save-row">
+                        <button type="submit" class="btn btn-primary" id="saveBtn">Save Lorebook</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="col">
+            <div class="panel">
+                <h3 style="margin-bottom:12px;">Library Preview</h3>
+                <div class="preview-card">
+                    <div class="preview-cover">
+                        <svg class="preview-cover-icon" viewBox="0 0 24 24" fill="none" stroke-width="1.5" stroke-linejoin="round">
+                            <path d="M12 4.5C10.1 3.1 7.2 2.5 4 3v14.5c3.2-.5 6.1.1 8 1.5 1.9-1.4 4.8-2 8-1.5V3c-3.2-.5-6.1.1-8 1.5z"/>
+                            <path d="M12 4.5v15" stroke-width="1.5"/>
+                        </svg>
+                        <span class="preview-cover-count" id="previewCoverCount">0 entries</span>
+                    </div>
+                    <div class="preview-body">
+                        <div class="preview-name">
+                            <span class="preview-color-dot" style="background-color: var(--color-primary); box-shadow: 0 0 8px var(--color-primary);"></span>
+                            <span id="previewName">Unnamed Lorebook</span>
+                        </div>
+                        <div class="preview-subtitle" id="previewSubtitle">0 entries</div>
+                        <div class="preview-desc" id="previewDesc">Add a description or a few entries to see a preview here.</div>
+                    </div>
+                </div>
+                <p class="info-note">ℹ️ Lorebook entries are currently a standalone knowledge base — they are not yet automatically inserted into your AI story prompts. Use them to keep your worldbuilding organized and searchable.</p>
+            </div>
+
+            <div class="panel">
+                <div class="entries-toolbar">
+                    <h3 style="flex:1;">Entries</h3>
+                    <div class="count-pill" id="entryCount">0</div>
+                </div>
+                <div class="form-group" style="margin-bottom:14px;">
+                    <input type="text" id="entrySearch" class="form-control" placeholder="🔍 Search entries by name, keyword or text…" oninput="renderEntries()">
+                </div>
+                <div class="entries-list" id="entriesList"></div>
+                <div class="empty" id="entriesEmpty">No entries yet. Add one on the left.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        if (typeof Dexie === 'undefined') {
+            alert('Dexie.js could not be loaded. Please check your internet connection or allow the CDN domains.');
+            throw new Error('Dexie not available');
+        }
+
+        const db = new Dexie('StoryAIDatabase');
+        db.version(1).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId'
+        });
+
+        let editId = null;
+        let isEditing = false;
+        let entries = [];
+        let editingEntryId = null;
+        let __lastGeneratedItemId = 0;
+
+        function getQueryParam(name) {
+            const params = new URLSearchParams(window.location.search);
+            return params.get(name);
+        }
+
+        function generateNewItemId(existingItems) {
+            const highestExisting = (existingItems || []).reduce((maxId, item) => Math.max(maxId, item.id || 0), 0);
+            const candidate = Math.max(Date.now(), highestExisting + 1, __lastGeneratedItemId + 1);
+            __lastGeneratedItemId = candidate;
+            return candidate;
+        }
+
+        function generateEntryId() {
+            return `lb_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        }
+
+        function normalizeTags(tagsRaw) {
+            return String(tagsRaw || '')
+                .split(',')
+                .map(t => t.trim())
+                .filter(Boolean)
+                .slice(0, 30);
+        }
+
+        function escapeHtml(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function updateCounter(fieldId, counterId, max) {
+            const field = document.getElementById(fieldId);
+            const counter = document.getElementById(counterId);
+            if (!field || !counter) return;
+            counter.innerText = String(field.value ? field.value.length : 0);
+        }
+
+        function clearFieldError(fieldId) {
+            const field = document.getElementById(fieldId);
+            if (field) field.classList.remove('has-error');
+        }
+
+        function syncToggleChip(inputId, chipId) {
+            const input = document.getElementById(inputId);
+            const chip = document.getElementById(chipId);
+            if (!input || !chip) return;
+            chip.classList.toggle('active', input.checked);
+        }
+
+        // --- Live preview (mirrors how the lorebook will look as a library card) ---
+        function updateLivePreview() {
+            const name = document.getElementById('lorebookName').value.trim() || 'Unnamed Lorebook';
+            const manualDesc = document.getElementById('lorebookDescription').value.trim();
+
+            const entryCountLabel = `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`;
+            document.getElementById('previewName').innerText = name;
+            document.getElementById('previewSubtitle').innerText = entryCountLabel;
+            document.getElementById('previewCoverCount').innerText = entryCountLabel;
+            document.getElementById('previewDesc').innerText = manualDesc || buildLorebookDescription(entries) || 'Add a description or a few entries to see a preview here.';
+            document.getElementById('navEntryCount').innerText = entryCountLabel;
+        }
+
+        function getFilteredEntries() {
+            const query = (document.getElementById('entrySearch')?.value || '').trim().toLowerCase();
+            let list = [...entries];
+            // Pinned entries always float to the top.
+            list.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+            if (!query) return list;
+            return list.filter(entry => {
+                const haystack = [
+                    entry.name,
+                    entry.description,
+                    ...(entry.tags || [])
+                ].join(' ').toLowerCase();
+                return haystack.includes(query);
+            });
+        }
+
+        function renderEntries() {
+            const list = document.getElementById('entriesList');
+            const empty = document.getElementById('entriesEmpty');
+            const count = document.getElementById('entryCount');
+            if (!list || !empty || !count) return;
+
+            count.innerText = String(entries.length);
+            const filtered = getFilteredEntries();
+
+            if (!entries.length) {
+                empty.style.display = 'block';
+                empty.innerText = 'No entries yet. Add one on the left.';
+                list.innerHTML = '';
+            } else if (!filtered.length) {
+                empty.style.display = 'block';
+                empty.innerText = 'No entries match your search.';
+                list.innerHTML = '';
+            } else {
+                empty.style.display = 'none';
+                list.innerHTML = filtered.map(entry => {
+                    const isEditingThis = entry.id === editingEntryId;
+                    const isDisabled = entry.enabled === false;
+                    const descHtml = entry.description
+                        ? escapeHtml(entry.description)
+                        : '<span class="empty-desc">No description yet.</span>';
+                    return `
+                    <div class="entry-card ${isEditingThis ? 'is-editing' : ''} ${isDisabled ? 'is-disabled' : ''}">
+                        <div class="entry-card-head">
+                            <div class="entry-card-title">
+                                <h4>${escapeHtml(entry.name)}</h4>
+                                ${entry.pinned ? '<span class="badge badge-pinned">📌 Pinned</span>' : ''}
+                                ${isDisabled ? '<span class="badge badge-disabled">Disabled</span>' : ''}
+                            </div>
+                        </div>
+                        <p class="${entry.description ? '' : 'empty-desc'}">${descHtml}</p>
+                        <div class="tag-row">
+                            ${(entry.tags || []).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}
+                        </div>
+                        <div class="entry-actions">
+                            <button type="button" class="btn btn-ghost" onclick="toggleEntryEnabled('${entry.id}')">${isDisabled ? '👁️ Enable' : '🚫 Disable'}</button>
+                            <button type="button" class="btn btn-secondary" onclick="editEntry('${entry.id}')">Edit</button>
+                            <button type="button" class="btn btn-danger" onclick="removeEntry('${entry.id}')">Remove</button>
+                        </div>
+                    </div>
+                `;
+                }).join('');
+            }
+
+            updateLivePreview();
+        }
+
+        function clearEntryForm() {
+            document.getElementById('entryName').value = '';
+            document.getElementById('entryDescription').value = '';
+            document.getElementById('entryTags').value = '';
+            document.getElementById('entryPinned').checked = false;
+            document.getElementById('entryEnabled').checked = true;
+            syncToggleChip('entryPinned', 'entryPinnedChip');
+            syncToggleChip('entryEnabled', 'entryEnabledChip');
+            updateCounter('entryDescription', 'entryDescCounter', 2000);
+            clearFieldError('entryName');
+            cancelEditEntry();
+        }
+
+        function editEntry(entryId) {
+            const entry = entries.find(e => e && e.id === entryId);
+            if (!entry) return;
+            editingEntryId = entryId;
+
+            document.getElementById('entryName').value = entry.name || '';
+            document.getElementById('entryDescription').value = entry.description || '';
+            document.getElementById('entryTags').value = (entry.tags || []).join(', ');
+            document.getElementById('entryPinned').checked = !!entry.pinned;
+            document.getElementById('entryEnabled').checked = entry.enabled !== false;
+            syncToggleChip('entryPinned', 'entryPinnedChip');
+            syncToggleChip('entryEnabled', 'entryEnabledChip');
+            updateCounter('entryDescription', 'entryDescCounter', 2000);
+
+            document.getElementById('entryFormTitle').innerText = 'Edit Entry';
+            document.getElementById('addEntryBtn').innerText = '✔ Update Entry';
+            const banner = document.getElementById('editingBanner');
+            banner.classList.add('visible');
+            document.getElementById('editingEntryName').innerText = entry.name || '';
+
+            renderEntries();
+            document.getElementById('entryName').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function cancelEditEntry() {
+            editingEntryId = null;
+            document.getElementById('entryFormTitle').innerText = 'Add Entry';
+            document.getElementById('addEntryBtn').innerText = '+ Add Entry';
+            document.getElementById('editingBanner').classList.remove('visible');
+            renderEntries();
+        }
+
+        function toggleEntryEnabled(entryId) {
+            const entry = entries.find(e => e && e.id === entryId);
+            if (!entry) return;
+            entry.enabled = entry.enabled === false ? true : false;
+            renderEntries();
+        }
+
+        // Reads the entry sub-form and either creates a new entry or updates the one
+        // currently being edited. Returns true if an entry was added/updated.
+        function addOrUpdateEntry({ silent = false } = {}) {
+            const nameEl = document.getElementById('entryName');
+            const descEl = document.getElementById('entryDescription');
+            const tagsEl = document.getElementById('entryTags');
+            if (!nameEl || !descEl || !tagsEl) return false;
+
+            const name = String(nameEl.value || '').trim();
+            const description = String(descEl.value || '').trim();
+            const tags = normalizeTags(tagsEl.value);
+            const pinned = !!document.getElementById('entryPinned')?.checked;
+            const enabled = document.getElementById('entryEnabled')?.checked !== false;
+
+            if (!name) {
+                if (!silent) {
+                    nameEl.classList.add('has-error');
+                    nameEl.focus();
+                    alert('Please enter an entry name.');
+                }
+                return false;
+            }
+
+            const duplicate = entries.find(e => e && e.id !== editingEntryId && e.name.trim().toLowerCase() === name.toLowerCase());
+            if (duplicate && !silent) {
+                const proceed = confirm(`An entry named "${name}" already exists. Add it anyway?`);
+                if (!proceed) return false;
+            }
+
+            if (editingEntryId) {
+                const target = entries.find(e => e && e.id === editingEntryId);
+                if (target) {
+                    target.name = name;
+                    target.description = description;
+                    target.tags = tags;
+                    target.pinned = pinned;
+                    target.enabled = enabled;
+                }
+            } else {
+                entries.unshift({
+                    id: generateEntryId(),
+                    name,
+                    description,
+                    tags,
+                    pinned,
+                    enabled
+                });
+            }
+
+            clearEntryForm();
+            renderEntries();
+            return true;
+        }
+
+        function removeEntry(entryId) {
+            const entry = entries.find(e => e && e.id === entryId);
+            if (!entry) return;
+            const confirmed = confirm(`Remove entry "${entry.name}"? This cannot be undone.`);
+            if (!confirmed) return;
+            entries = entries.filter(e => e && e.id !== entryId);
+            if (editingEntryId === entryId) cancelEditEntry();
+            renderEntries();
+        }
+
+        async function loadStoredItems() {
+            try {
+                return await db.table('characters').toArray();
+            } catch (_) {
+                return [];
+            }
+        }
+
+        function buildLorebookDescription(list) {
+            const names = (list || []).map(e => String(e?.name || '').trim()).filter(Boolean);
+            if (!names.length) return '';
+            return names.slice(0, 6).join(' • ');
+        }
+
+        function buildLorebookTags(list) {
+            const tagSet = new Set();
+            (list || []).forEach(entry => {
+                (entry?.tags || []).forEach(tag => tagSet.add(String(tag)));
+            });
+            return Array.from(tagSet).filter(Boolean).slice(0, 40);
+        }
+
+        async function handleSave(e) {
+            e.preventDefault();
+            const nameEl = document.getElementById('lorebookName');
+            if (!nameEl) return;
+
+            const lorebookName = String(nameEl.value || '').trim();
+            if (!lorebookName) {
+                nameEl.classList.add('has-error');
+                nameEl.focus();
+                alert('Please enter a lorebook name.');
+                return;
+            }
+
+            // If the entry sub-form still has an unsaved name typed in, add/update it
+            // automatically so nothing the user typed gets silently lost on save.
+            const pendingEntryName = document.getElementById('entryName')?.value.trim();
+            if (pendingEntryName) {
+                addOrUpdateEntry({ silent: true });
+            }
+
+            const saveBtn = document.getElementById('saveBtn');
+            const originalBtnText = saveBtn ? saveBtn.innerText : '';
+            if (saveBtn) {
+                saveBtn.disabled = true;
+                saveBtn.innerText = 'Saving…';
+            }
+
+            try {
+                const savedItems = await loadStoredItems();
+                const id = editId || generateNewItemId(savedItems);
+                const tags = buildLorebookTags(entries);
+                const manualDescription = document.getElementById('lorebookDescription').value.trim();
+                const existing = savedItems.find(item => item && item.id === id) || {};
+                const avatar = existing.avatar || '';
+                const color = existing.color || '#6366f1';
+
+                const lorebookEntity = {
+                    ...existing,
+                    id,
+                    type: 'lorebook',
+                    name: lorebookName,
+                    storyName: lorebookName,
+                    subtitle: `${entries.length} ${entries.length === 1 ? 'entry' : 'entries'}`,
+                    description: manualDescription || buildLorebookDescription(entries),
+                    entries,
+                    tags,
+                    avatar,
+                    backgroundURL: existing.backgroundURL || '',
+                    backgroundBlur: typeof existing.backgroundBlur === 'number' ? existing.backgroundBlur : 15,
+                    backgroundBlurPx: typeof existing.backgroundBlurPx === 'number' ? existing.backgroundBlurPx : 15,
+                    color,
+                    lastPlayed: Date.now(),
+                    engine: 'StoryAI Lorebook',
+                    favorite: !!existing.favorite,
+                    isUserCreated: true
+                };
+
+                await db.table('characters').put(lorebookEntity);
+                alert(`🎉 Success! Lorebook "${lorebookName}" was successfully ${isEditing ? 'updated' : 'created'}.`);
+                window.location.href = '../index.html';
+            } catch (err) {
+                console.error('Failed to save lorebook:', err);
+                alert('⚠️ Something went wrong while saving. Please try again.');
+                if (saveBtn) {
+                    saveBtn.disabled = false;
+                    saveBtn.innerText = originalBtnText;
+                }
+            }
+        }
+
+        async function initializeForm() {
+            updateCounter('lorebookDescription', 'lorebookDescCounter', 220);
+            updateCounter('entryDescription', 'entryDescCounter', 2000);
+
+            const editParam = getQueryParam('id');
+            if (!editParam) {
+                renderEntries();
+                return;
+            }
+            const editIdValue = parseInt(editParam, 10);
+            if (!Number.isFinite(editIdValue)) {
+                renderEntries();
+                return;
+            }
+
+            const savedItems = await loadStoredItems();
+            const stored = savedItems.find(item => item && item.id === editIdValue && item.type === 'lorebook');
+            if (!stored) {
+                renderEntries();
+                return;
+            }
+
+            editId = stored.id;
+            isEditing = true;
+            const pageTitle = document.getElementById('pageTitle');
+            const navTitle = document.getElementById('navTitle');
+            const saveBtn = document.getElementById('saveBtn');
+            if (pageTitle) pageTitle.innerText = 'Edit Lorebook';
+            if (navTitle) navTitle.innerText = 'Edit Lorebook';
+            if (saveBtn) saveBtn.innerText = 'Save Changes';
+
+            document.getElementById('lorebookName').value = stored.name || stored.storyName || '';
+            document.getElementById('lorebookDescription').value = stored.description || '';
+
+            entries = Array.isArray(stored.entries)
+                ? stored.entries.map(entry => ({
+                    id: entry?.id || generateEntryId(),
+                    name: entry?.name || '',
+                    description: entry?.description || '',
+                    tags: Array.isArray(entry?.tags) ? entry.tags : [],
+                    pinned: !!entry?.pinned,
+                    enabled: entry?.enabled !== false
+                }))
+                : [];
+
+            updateCounter('lorebookDescription', 'lorebookDescCounter', 220);
+            renderEntries();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initializeForm();
+        });
+    </script>
+</body>
+</html>
