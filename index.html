@@ -759,6 +759,13 @@
                 padding: 16px 16px 14px;
             }
 
+            /* "Recently Active" wird auf Mobil komplett ausgeblendet - auf
+               kleinen Screens ist der Platz zu knapp und die Bibliothek direkt
+               darunter ist wichtiger. */
+            .recent-active-section {
+                display: none;
+            }
+
             .recent-list {
                 flex-direction: row;
                 overflow-x: auto;
@@ -941,6 +948,70 @@
             }
         }
 
+        /* --- MOBILE USABILITY FIXES ---
+           1) iOS Safari zoomt automatisch in Formularfelder mit font-size < 16px.
+              Das führte dazu, dass beim Antippen von Such-/Einstellungsfeldern die
+              ganze Seite ungewollt reinzoomt. Auf Mobilgeräten setzen wir daher
+              16px als Mindestgröße für alle Eingabefelder.
+           2) Touch-Ziele (Zahnrad, Persona-Icon, Toggle-Switches) waren teils
+              kleiner als die empfohlenen ~44x44px - auf Mobil vergrößert.
+           3) Der Einstellungen-Bereich (settings-row) blieb bislang immer eine feste
+              Zeile mit fix breitem API-Key-Feld (250px), was auf schmalen Screens
+              überläuft bzw. sehr eng wird - jetzt stapelt er sich sauber. */
+        @media (max-width: 768px) {
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+
+            .settings-icon-btn,
+            .persona-icon-btn {
+                width: 44px;
+                height: 44px;
+            }
+
+            .toggle-switch {
+                width: 48px;
+                height: 26px;
+            }
+            .toggle-switch .slider:before {
+                height: 18px;
+                width: 18px;
+            }
+            .toggle-switch input:checked + .slider:before {
+                transform: translateX(22px);
+            }
+
+            .settings-row {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+
+            .settings-row-info {
+                width: 100%;
+            }
+
+            #settingsApiKey {
+                width: 100% !important;
+            }
+
+            .create-choice-modal {
+                width: calc(100vw - 24px);
+                max-height: 85vh;
+                overflow-y: auto;
+            }
+        }
+
+        /* Sehr kleine Screens: iPhone SE & Co. */
+        @media (max-width: 380px) {
+            .sidebar-header h1 {
+                font-size: 1.1rem;
+            }
+            .library-title h2 {
+                font-size: 1.4rem;
+            }
+        }
+
         .create-choice-backdrop {
             position: fixed;
             inset: 0;
@@ -1056,8 +1127,10 @@
                 </button>
             </div>
         </div>
-        <div class="section-title">Recently Active</div>
-        <div class="recent-list" id="recentList">
+        <div class="recent-active-section" id="recentActiveSection">
+            <div class="section-title">Recently Active</div>
+            <div class="recent-list" id="recentList">
+            </div>
         </div>
     </aside>
 
