@@ -321,6 +321,90 @@
             box-shadow: 0 6px 20px rgba(99, 102, 241, 0.5);
         }
 
+        .create-menu-wrapper {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: flex-end;
+        }
+
+        .create-menu {
+            position: absolute;
+            top: calc(100% + 10px);
+            right: 0;
+            width: 180px;
+            max-width: calc(100vw - 32px);
+            background: #0b0b12;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 16px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+            padding: 8px;
+            z-index: 2200;
+            display: grid;
+            gap: 6px;
+        }
+
+        .create-menu-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            background: #171722;
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--text-main);
+            border-radius: 12px;
+            padding: 9px 12px;
+            font-size: 0.9rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: var(--transition);
+            text-align: left;
+        }
+
+        .create-menu-item:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255,255,255,0.24);
+            background: #1f1f2d;
+        }
+
+        /* Kopfzeile der zweiten Menü-Stufe (Typ-Auswahl) mit Zurück-Pfeil.
+           Ersetzt die vorherige Stufe komplett statt sie darunter anzuhängen. */
+        .create-menu-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 2px 2px 4px;
+        }
+
+        .create-menu-header span {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .create-menu-back {
+            appearance: none;
+            background: rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: var(--text-main);
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            transition: var(--transition);
+        }
+
+        .create-menu-back:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
         /* Filter Tabs */
         .filter-tabs {
             display: flex;
@@ -527,6 +611,14 @@
             display: flex;
             gap: 8px;
             width: 100%;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .card-actions::-webkit-scrollbar {
+            display: none;
         }
 
         .card-btn {
@@ -539,6 +631,7 @@
             transition: var(--transition);
             text-align: center;
             border: 1px solid transparent;
+            white-space: nowrap;
         }
 
         .card-btn-play {
@@ -712,6 +805,14 @@
             filter: brightness(1.1);
         }
 
+        /* Edit/Save/Delete Reihe in der Detailansicht - selbe Optik wie die
+           Karten-Aktionen in der Bibliothek (.card-btn), nur ohne Play-Button,
+           da "Chat starten" bereits als großer Button darüber steht. */
+        .detail-actions-row {
+            display: flex;
+            gap: 8px;
+        }
+
         /* Settings spezifische Styles */
         .settings-row {
             display: flex;
@@ -823,6 +924,8 @@
                 width: auto;
                 justify-content: center;
                 white-space: nowrap;
+                padding: 10px 14px;
+                font-size: 0.88rem;
             }
 
             .filter-tabs {
@@ -855,15 +958,8 @@
                 font-size: 1.05rem;
             }
 
-            .card-actions {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 8px;
-            }
-
             .card-btn {
-                width: 100%;
-                padding: 9px 8px;
+                padding: 9px 10px;
             }
 
             .detail-hero {
@@ -905,8 +1001,12 @@
                 font-size: 1.6rem;
             }
 
+            .card-badge {
+                display: none;
+            }
+
             .library-grid {
-                grid-template-columns: repeat(2, minmax(0, 1fr));
+                grid-template-columns: repeat(3, minmax(0, 1fr));
                 gap: 10px;
             }
 
@@ -926,12 +1026,9 @@
                 font-size: 0.82rem;
             }
 
-            .card-actions {
-                grid-template-columns: 1fr;
-            }
-
             .card-btn {
-                padding: 10px 10px;
+                padding: 8px 8px;
+                font-size: 0.78rem;
             }
 
             .section-title {
@@ -949,15 +1046,8 @@
             }
 
             .library-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .topbar-actions {
-                grid-template-columns: 1fr;
-            }
-
-            .create-btn {
-                width: 100%;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 8px;
             }
 
             .card-cover {
@@ -1175,6 +1265,28 @@
 
     <main class="dashboard-main" id="dashboardMain">
     </main>
+
+    <!-- Diese Elemente werden von mehreren Ansichten gebraucht (Bibliothek UND
+         Detailansicht, s. "Save"-Button dort), deshalb liegen sie fest im Body
+         statt in einem der per renderMainArea() ausgetauschten View-Templates. -->
+    <input type="file" id="characterImportInput" accept=".json,application/json" style="display:none" onchange="handleCharacterImportFile(event)">
+
+    <div class="create-choice-backdrop" id="characterExportBackdrop" style="display: none;" onclick="closeCharacterExportChoice()"></div>
+    <div class="create-choice-modal" id="characterExportModal" style="display: none;" role="dialog" aria-modal="true">
+        <div class="create-choice-modal__header">
+            <div>
+                <div class="create-choice-modal__title">Save the character with stories or without?</div>
+                <div class="create-choice-modal__subtitle">This character has stories in your library.</div>
+            </div>
+            <button type="button" class="modal-close-btn" onclick="closeCharacterExportChoice()" title="Close">
+                <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
+            </button>
+        </div>
+        <div class="create-choice-modal__body">
+            <button type="button" class="create-choice-option" onclick="handleCharacterExportChoice(true)">Save the character along with all stories.<span>Includes story chat/memory data</span></button>
+            <button type="button" class="create-choice-option" onclick="handleCharacterExportChoice(false)">Save the character without stories.<span>Character only</span></button>
+        </div>
+    </div>
 
     <script>
         // Gemeinsame Dexie-Datenbank - MUSS identisch mit dem Schema in
@@ -1867,6 +1979,15 @@
                 } else if (loadedFilter === 'lorebook' && !items.some(item => item.type === 'lorebook')) {
                     currentFilter = 'all';
                     await saveLastFilter('all');
+                } else if (loadedFilter === 'character' && !items.some(item => item.type === 'character')) {
+                    currentFilter = 'all';
+                    await saveLastFilter('all');
+                } else if (loadedFilter === 'world' && !items.some(item => item.type === 'world')) {
+                    currentFilter = 'all';
+                    await saveLastFilter('all');
+                } else if (loadedFilter === 'story' && !items.some(item => item.type === 'story')) {
+                    currentFilter = 'all';
+                    await saveLastFilter('all');
                 } else {
                     currentFilter = loadedFilter;
                 }
@@ -1922,11 +2043,25 @@
             if (!tabs) return;
             const hasFavorites = items.some(item => item.favorite);
             const hasLorebooks = items.some(item => item.type === 'lorebook');
+            const hasCharacters = items.some(item => item.type === 'character');
+            const hasWorlds = items.some(item => item.type === 'world');
+            const hasStories = items.some(item => item.type === 'story');
+
+            if (
+                (currentFilter === 'character' && !hasCharacters) ||
+                (currentFilter === 'world' && !hasWorlds) ||
+                (currentFilter === 'story' && !hasStories) ||
+                (currentFilter === 'lorebook' && !hasLorebooks) ||
+                (currentFilter === 'favorite' && !hasFavorites)
+            ) {
+                currentFilter = 'all';
+                saveLastFilter('all');
+            }
             tabs.innerHTML = `
                 <button class="filter-tab ${currentFilter === 'all' ? 'active' : ''}" onclick="setFilter('all')">All entries</button>
-                <button class="filter-tab ${currentFilter === 'character' ? 'active' : ''}" onclick="setFilter('character')">Characters</button>
-                <button class="filter-tab ${currentFilter === 'world' ? 'active' : ''}" onclick="setFilter('world')">Worlds</button>
-                <button class="filter-tab ${currentFilter === 'story' ? 'active' : ''}" onclick="setFilter('story')">Stories</button>
+                ${hasCharacters ? `<button class="filter-tab ${currentFilter === 'character' ? 'active' : ''}" onclick="setFilter('character')">Characters</button>` : ''}
+                ${hasWorlds ? `<button class="filter-tab ${currentFilter === 'world' ? 'active' : ''}" onclick="setFilter('world')">Worlds</button>` : ''}
+                ${hasStories ? `<button class="filter-tab ${currentFilter === 'story' ? 'active' : ''}" onclick="setFilter('story')">Stories</button>` : ''}
                 ${hasLorebooks ? `<button class="filter-tab ${currentFilter === 'lorebook' ? 'active' : ''}" onclick="setFilter('lorebook')">Lorebooks</button>` : ''}
                 ${hasFavorites ? `<button class="filter-tab ${currentFilter === 'favorite' ? 'active' : ''}" onclick="setFilter('favorite')">Favorite</button>` : ''}
             `;
@@ -1980,9 +2115,7 @@
                         <div class="card-body">
                             <div class="card-title">
                                 ${item.name}
-                                <span class="color-dot" style="background-color: ${item.color}; box-shadow: 0 0 8px ${item.color};"></span>
                             </div>
-                            <div class="card-subtitle" style="color: ${item.color}">${item.subtitle}</div>
                             <div class="card-desc">${item.description}</div>
                             <div class="card-footer">
                                 <div class="card-actions">
@@ -2230,6 +2363,21 @@
             renderMainArea();
         }
 
+        // Löschen direkt aus der Detailansicht heraus (Button neben "Chat starten").
+        // Springt danach zurück zur Bibliothek, da activeId sonst auf ein
+        // gelöschtes Element zeigen würde.
+        async function deleteItemFromDetail(event, id) {
+            if (event) event.stopPropagation();
+            const item = items.find(i => i.id === id);
+            const label = item ? item.name : 'this entry';
+            if (!confirm(`Really delete "${label}"? This cannot be undone.`)) return;
+            items = items.filter(i => i.id !== id);
+            await saveStoredItems(items);
+            await deleteItemDataCascade(id);
+            activeId = null;
+            renderApp();
+        }
+
         function playItem(id) {
             const item = items.find(i => i.id === id);
             if (!item) return;
@@ -2242,52 +2390,75 @@
             }
         }
 
-        let isCreateChoiceOpen = false;
-        let createChoiceStep = 'start';
+        let isCreateMenuOpen = false;
+        // 'root'  -> zeigt "Create" / "Load"
+        // 'type'  -> zeigt "Character" / "World" / "Lorebook" (ersetzt "root" komplett, statt darunter zu erscheinen)
+        let createMenuStep = 'root';
 
-        function setCreateChoiceStep(step) {
-            createChoiceStep = step === 'type' ? 'type' : 'start';
-            const title = document.getElementById('createChoiceTitle');
-            const subtitle = document.getElementById('createChoiceSubtitle');
-            const startBody = document.getElementById('createChoiceStartBody');
-            const typeBody = document.getElementById('createChoiceTypeBody');
-            const backBtn = document.getElementById('createChoiceBackBtn');
-            if (!title || !subtitle || !startBody || !typeBody || !backBtn) return;
-
-            if (createChoiceStep === 'type') {
-                title.textContent = 'What do you want to create?';
-                subtitle.textContent = 'Choose what you want to add to your library';
-                startBody.style.display = 'none';
-                typeBody.style.display = 'grid';
-                backBtn.style.display = 'inline-flex';
-                return;
+        function createMenuContentHTML() {
+            if (createMenuStep === 'type') {
+                return `
+                    <div class="create-menu-header">
+                        <button type="button" class="create-menu-back" onclick="showCreateMenuRoot(event)" title="Back">
+                            <svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                        </button>
+                        <span>Create</span>
+                    </div>
+                    <button type="button" class="create-menu-item" onclick="handleCreateChoice('character')">Character</button>
+                    <button type="button" class="create-menu-item" onclick="handleCreateChoice('world')">World</button>
+                    <button type="button" class="create-menu-item" onclick="handleCreateChoice('lorebook')">Lorebook</button>
+                `;
             }
-
-            title.textContent = 'Load or Create?';
-            subtitle.textContent = 'Import a character JSON or create something new';
-            startBody.style.display = 'grid';
-            typeBody.style.display = 'none';
-            backBtn.style.display = 'none';
+            return `
+                <button type="button" class="create-menu-item" onclick="showCreateMenuType(event)">Create</button>
+                <button type="button" class="create-menu-item" onclick="handleCreateMenuLoad(event)">Load</button>
+            `;
         }
 
-        function openCreateChoice() {
-            isCreateChoiceOpen = true;
-            const backdrop = document.getElementById('createChoiceBackdrop');
-            const modal = document.getElementById('createChoiceModal');
-            if (!backdrop || !modal) return;
-            backdrop.style.display = 'block';
-            modal.style.display = 'block';
-            setCreateChoiceStep('start');
+        function syncCreateMenuDom() {
+            const menu = document.getElementById('createMenu');
+            if (!menu) return;
+            menu.style.display = isCreateMenuOpen ? 'grid' : 'none';
+            menu.innerHTML = createMenuContentHTML();
+        }
+
+        function openCreateChoice(event) {
+            if (event) event.stopPropagation();
+            isCreateMenuOpen = !isCreateMenuOpen;
+            createMenuStep = 'root';
+            syncCreateMenuDom();
         }
 
         function closeCreateChoice() {
-            isCreateChoiceOpen = false;
-            const backdrop = document.getElementById('createChoiceBackdrop');
-            const modal = document.getElementById('createChoiceModal');
-            if (!backdrop || !modal) return;
-            backdrop.style.display = 'none';
-            modal.style.display = 'none';
+            isCreateMenuOpen = false;
+            createMenuStep = 'root';
+            syncCreateMenuDom();
         }
+
+        function showCreateMenuType(event) {
+            if (event) event.stopPropagation();
+            createMenuStep = 'type';
+            syncCreateMenuDom();
+        }
+
+        function showCreateMenuRoot(event) {
+            if (event) event.stopPropagation();
+            createMenuStep = 'root';
+            syncCreateMenuDom();
+        }
+
+        function handleCreateMenuLoad(event) {
+            if (event) event.stopPropagation();
+            closeCreateChoice();
+            triggerCharacterImport();
+        }
+
+        document.addEventListener('click', event => {
+            if (!isCreateMenuOpen) return;
+            const wrapper = document.getElementById('createMenuWrapper');
+            if (wrapper && wrapper.contains(event.target)) return;
+            closeCreateChoice();
+        });
 
         function triggerCharacterImport() {
             const input = document.getElementById('characterImportInput');
@@ -2721,60 +2892,15 @@
                                 <svg class="search-icon" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
                                 <input id="searchInput" type="text" placeholder="Search library..." value="${searchQuery}" onkeyup="handleSearch(event)">
                             </div>
-                            <button class="create-btn" onclick="openCreateChoice()">+ Create</button>
+                            <div class="create-menu-wrapper" id="createMenuWrapper">
+                                <button class="create-btn" onclick="openCreateChoice(event)">+ Create</button>
+                                <div class="create-menu" id="createMenu" style="display: ${isCreateMenuOpen ? 'grid' : 'none'};">${createMenuContentHTML()}</div>
+                            </div>
                         </div>
                     </div>
 
                     <div id="filterTabs" class="filter-tabs animate-in"></div>
                     <div id="libraryGrid" class="library-grid"></div>
-
-                    <div class="create-choice-backdrop" id="createChoiceBackdrop" style="display: none;" onclick="closeCreateChoice()"></div>
-                    <div class="create-choice-modal" id="createChoiceModal" style="display: none;" role="dialog" aria-modal="true">
-                        <div class="create-choice-modal__header">
-                            <div>
-                                <div class="create-choice-modal__title" id="createChoiceTitle">Load or Create?</div>
-                                <div class="create-choice-modal__subtitle" id="createChoiceSubtitle">Import a character JSON or create something new</div>
-                            </div>
-                            <div style="display:flex; gap: 10px;">
-                                <button type="button" class="modal-back-btn" id="createChoiceBackBtn" onclick="setCreateChoiceStep('start')" title="Back" style="display:none;">
-                                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
-                                </button>
-                                <button type="button" class="modal-close-btn" onclick="closeCreateChoice()" title="Close">
-                                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="create-choice-modal__body">
-                            <div id="createChoiceStartBody" style="display: grid; gap: 10px;">
-                                <button type="button" class="create-choice-option" onclick="setCreateChoiceStep('type')">Create <span>Make something new</span></button>
-                                <button type="button" class="create-choice-option" onclick="triggerCharacterImport()">Load .json <span>Import a character</span></button>
-                            </div>
-                            <div id="createChoiceTypeBody" style="display: none; gap: 10px;">
-                                <button type="button" class="create-choice-option" onclick="handleCreateChoice('character')">Character <span>Chat character</span></button>
-                                <button type="button" class="create-choice-option" onclick="handleCreateChoice('world')">World <span>Setting / place</span></button>
-                                <button type="button" class="create-choice-option" onclick="handleCreateChoice('lorebook')">Lorebook <span>Knowledge base</span></button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <input type="file" id="characterImportInput" accept=".json,application/json" style="display:none" onchange="handleCharacterImportFile(event)">
-
-                    <div class="create-choice-backdrop" id="characterExportBackdrop" style="display: none;" onclick="closeCharacterExportChoice()"></div>
-                    <div class="create-choice-modal" id="characterExportModal" style="display: none;" role="dialog" aria-modal="true">
-                        <div class="create-choice-modal__header">
-                            <div>
-                                <div class="create-choice-modal__title">Save the character with stories or without?</div>
-                                <div class="create-choice-modal__subtitle">This character has stories in your library.</div>
-                            </div>
-                            <button type="button" class="modal-close-btn" onclick="closeCharacterExportChoice()" title="Close">
-                                <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
-                            </button>
-                        </div>
-                        <div class="create-choice-modal__body">
-                            <button type="button" class="create-choice-option" onclick="handleCharacterExportChoice(true)">Save the character along with all stories.<span>Includes story chat/memory data</span></button>
-                            <button type="button" class="create-choice-option" onclick="handleCharacterExportChoice(false)">Save the character without stories.<span>Character only</span></button>
-                        </div>
-                    </div>
                 `;
                 renderFilterTabs();
                 renderLibraryGrid();
@@ -2786,6 +2912,14 @@
 
                 const tagsHTML = item.tags.map(tag => `<span class="tag">${tag}</span>`).join('');
                 let btnText = item.type === 'character' ? 'Chat starten' : item.type === 'world' ? 'Welt betreten' : item.type === 'lorebook' ? 'Lorebook öffnen' : 'Story fortsetzen';
+                const isCharacterDetail = item.type === 'character';
+                const isLorebookDetail = item.type === 'lorebook';
+                const isStoryDetail = item.type === 'story';
+                const editHandlerDetail = isStoryDetail
+                    ? `openItemEdit(${item.id})`
+                    : isLorebookDetail
+                        ? `window.location.href='Lorebook/CreateLorebook.html?id=${item.id}'`
+                        : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`;
 
                 main.innerHTML = `
                     <div class="animate-in">
@@ -2798,7 +2932,6 @@
                             <div class="detail-avatar" style="background-image: url('${item.avatar}'); border-color: ${item.color}"></div>
                             <div class="detail-info">
                                 <h1>${item.name}</h1>
-                                <p style="color: ${item.color}; font-weight: 600;">${item.subtitle}</p>
                             </div>
                         </div>
 
@@ -2813,11 +2946,10 @@
                                 <button class="action-btn-large" style="background-color: ${item.color}; box-shadow: 0 4px 20px ${item.color}44;" onclick="playItem(${item.id})">
                                     ${btnText}
                                 </button>
-                                <div class="detail-panel" style="margin-top: 20px;">
-                                    <h3>⚙️ Setup</h3>
-                                    <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 8px;">KI Engine:</p>
-                                    <p style="font-weight: 600; margin-bottom: 15px;">${item.engine}</p>
-                                    <button style="width:100%; padding:10px; background:rgba(255,255,255,0.05); border:1px solid rgba(255,255,255,0.1); color:#fff; border-radius:10px; cursor:pointer;" onclick="${item.type === 'story' ? `openItemEdit(${item.id})` : item.type === 'lorebook' ? `window.location.href='Lorebook/CreateLorebook.html?id=${item.id}'` : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`}">Edit</button>
+                                <div class="detail-actions-row">
+                                    <button class="card-btn card-btn-edit" onclick="${editHandlerDetail}">Edit</button>
+                                    ${isCharacterDetail ? `<button class="card-btn card-btn-save card-btn-icon" onclick="saveCharacterFromCard(event, ${item.id})" title="Save">${DOWNLOAD_ICON_SVG}</button>` : ''}
+                                    <button class="card-btn card-btn-delete card-btn-icon" onclick="deleteItemFromDetail(event, ${item.id})" title="Delete">${TRASH_ICON_SVG}</button>
                                 </div>
                             </div>
                         </div>
