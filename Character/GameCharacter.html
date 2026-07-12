@@ -1827,14 +1827,33 @@
             }
         }
 
-        // Generic memory DB handles - populated at runtime by either initOrama()
-        // or initTransformerJS(), depending on the user's "Memory System" setting.
-        // Both backends expose the same call shape used throughout this file:
-        //   oramaInsert(oramaDB, { role, content })
+        // Memory backends. Historically this app ran EITHER Orama (lexical/full-text
+        // search) OR Transformer.js (in-browser vector embeddings) as a drop-in
+        // replacement for the other, depending on the "Memory System" setting.
+        //
+        // This has been refactored into a Hybrid Search setup: when Transformer.js
+        // is active, BOTH backends are initialized and queried together, and their
+        // results are merged with Reciprocal Rank Fusion (RRF). This gives us the
+        // precision of lexical/keyword matching (Orama) plus the recall of semantic/
+        // vector similarity (Transformer.js), instead of only ever having one.
+        //
+        // Orama handles (always used when available - lexical search):
+        //   oramaInsert(oramaDB, { role, content, ... })
         //   oramaSearch(oramaDB, { term, limit, tolerance }) -> { hits: [{ document: { content } }] }
         let oramaDB = null;
         let oramaInsert = null;
         let oramaSearch = null;
+
+        // Transformer.js vector handles (only used when the "Transformer.js" memory
+        // system is selected AND the local model has loaded successfully - semantic
+        // search). Independent in-memory array, never overwrites the Orama handles.
+        //   vectorInsert({ messageId, role, content, ... })
+        //   vectorSearch(term, limit) -> { hits: [{ document: { content }, score }] }
+        let vectorDB = [];
+        let vectorInsert = null;
+        let vectorSearch = null;
+        let isTransformerJsActive = false;
+
         let resetMemoryBackend = null;
         let transformerPipeline = null;
 
@@ -1992,6 +2011,9 @@
                         }
                     });
                     indexedMemoryMessageIds = new Set();
+                    // Keep the vector store (if hybrid mode is active) in sync with
+                    // the Orama index - both are always rebuilt together.
+                    vectorDB.length = 0;
                 };
 
                 await resetMemoryBackend();
@@ -2003,6 +2025,7 @@
                 resetMemoryBackend = async () => {
                     oramaDB = null;
                     indexedMemoryMessageIds = new Set();
+                    vectorDB.length = 0;
                 };
             }
         }
@@ -2058,10 +2081,13 @@
                     return Array.from(output.data);
                 };
 
-                // In-memory vector store; drop-in replacement for the Orama handles.
-                oramaInsert = async (db, { role, content, sender, messageId, characterId, timestamp }) => {
+                // Independent in-memory vector store. This NO LONGER overwrites the
+                // Orama handles - Orama keeps running for lexical search, and this
+                // vector backend runs alongside it for semantic search. The two are
+                // combined later in memorySearch() via Reciprocal Rank Fusion.
+                vectorInsert = async ({ role, content, sender, messageId, characterId, timestamp }) => {
                     const embedding = await embed(String(content));
-                    db.push({
+                    vectorDB.push({
                         role,
                         sender: sender || role,
                         content: String(content),
@@ -2072,33 +2098,29 @@
                     });
                 };
 
-                oramaSearch = async (db, { term, limit = 3 }) => {
-                    if (!db.length) return { hits: [] };
+                vectorSearch = async (term, limit = 3) => {
+                    if (!vectorDB.length) return { hits: [] };
                     const queryEmbedding = await embed(String(term));
-                    const hits = db
-                        .map(entry => ({ document: { role: entry.role, content: entry.content }, score: cosineSimilarity(queryEmbedding, entry.embedding) }))
+                    const hits = vectorDB
+                        .map(entry => ({
+                            document: { messageId: entry.messageId, role: entry.role, content: entry.content },
+                            score: cosineSimilarity(queryEmbedding, entry.embedding)
+                        }))
                         .sort((a, b) => b.score - a.score)
                         .slice(0, limit);
                     return { hits };
                 };
-                resetMemoryBackend = async () => {
-                    oramaDB = [];
-                    indexedMemoryMessageIds = new Set();
-                };
 
-                await resetMemoryBackend();
+                isTransformerJsActive = true;
 
                 reportModelStatus('loaded');
             } catch (err) {
                 console.warn('Could not initialize Transformer.js pipeline:', err);
                 transformerPipeline = null;
-                oramaDB = null;
-                oramaInsert = async () => [];
-                oramaSearch = async () => ({ hits: [] });
-                resetMemoryBackend = async () => {
-                    oramaDB = null;
-                    indexedMemoryMessageIds = new Set();
-                };
+                vectorDB = [];
+                vectorInsert = async () => {};
+                vectorSearch = async () => ({ hits: [] });
+                isTransformerJsActive = false;
                 const errorName = (() => {
                     try { return err && typeof err === 'object' ? err.name : null; } catch (_) { return null; }
                 })();
@@ -2111,7 +2133,10 @@
         }
 
         // Reads the user's "Memory System" preference from Dexie and initializes
-        // the matching backend. Defaults to Orama when unset (null/undefined).
+        // the matching backend(s). Defaults to Orama when unset (null/undefined).
+        // When "Transformer.js" is active and its model is loaded, BOTH Orama and
+        // Transformer.js are initialized (Hybrid Search) - see memoryInsert() and
+        // memorySearch() below for how they're used together.
         async function initMemorySystem() {
             const preference = settings.memorySystem;
             if (preference === 'Transformer.js') {
@@ -2119,16 +2144,22 @@
                     try { return localStorage.getItem(MODEL_STATUS_KEY); } catch (_) { return null; }
                 })();
                 if (status !== 'loaded') {
+                    // Fallback: model isn't loaded, strictly use Orama only.
                     settings.memorySystem = 'Orama';
                     try { await db.table('settings').put({ id: 1, value: settings }); } catch (err) { console.warn('Error saving settings:', err); }
                     try { localStorage.setItem(MEMORY_SYSTEM_SYNC_KEY, 'Orama'); } catch (_) {}
                     try { settingsSyncChannel?.postMessage({ type: 'memorySystem', value: 'Orama' }); } catch (_) {}
+                    isTransformerJsActive = false;
                     await initOrama();
                     return;
                 }
+                // Hybrid Search: initialize Orama (lexical) AND Transformer.js
+                // (semantic/vector) together, rather than one replacing the other.
+                await initOrama();
                 await initTransformerJS();
                 return;
             }
+            isTransformerJsActive = false;
             await initOrama();
         }
 
@@ -2914,6 +2945,91 @@
             return memoryTaskChain;
         }
 
+        // Unified insert used by all call sites instead of calling oramaInsert()
+        // directly. Writes into Orama (lexical index) AND, when the Transformer.js
+        // vector backend is active, also computes the embedding and writes into
+        // vectorDB - so both indexes always stay in sync with each other.
+        async function memoryInsert(text, metadata = {}) {
+            const doc = {
+                messageId: metadata.messageId ? String(metadata.messageId) : '',
+                role: metadata.role || 'user',
+                sender: metadata.sender || metadata.role || 'user',
+                content: String(text ?? metadata.content ?? ''),
+                characterId: Number.isFinite(metadata.characterId) ? metadata.characterId : -1,
+                timestamp: Number(metadata.timestamp) || Date.now()
+            };
+            if (!doc.content) return doc;
+
+            const tasks = [];
+            if (typeof oramaInsert === 'function' && oramaDB) {
+                tasks.push(oramaInsert(oramaDB, doc));
+            }
+            if (isTransformerJsActive && typeof vectorInsert === 'function') {
+                tasks.push(vectorInsert(doc));
+            }
+            if (tasks.length) {
+                await Promise.all(tasks);
+            }
+            return doc;
+        }
+
+        // Unified Hybrid Search. Queries Orama (lexical/keyword search) and, when
+        // active, the Transformer.js vector backend (semantic search) in parallel,
+        // then merges the two ranked hit lists with Reciprocal Rank Fusion (RRF):
+        // each hit's score is 1 / (k + rank), scores for the same memory entry are
+        // summed across backends, and the combined list is sorted and de-duplicated.
+        // This means a memory that ranks well in BOTH lexical and semantic search
+        // rises to the top, while a memory found by only one backend still counts.
+        async function memorySearch(query, limit = MEMORY_RETRIEVAL_LIMIT) {
+            const RRF_K = 60; // standard RRF smoothing constant
+            const ranked = new Map(); // dedupe key -> { score, hit }
+
+            const addRankedHits = (hits) => {
+                (Array.isArray(hits) ? hits : []).forEach((hit, index) => {
+                    const documentData = hit?.document || hit || {};
+                    const key = documentData.messageId
+                        ? `id:${documentData.messageId}`
+                        : `text:${normalizeMemoryText(documentData.content, 1200).toLowerCase()}`;
+                    if (!key || key === 'id:' || key === 'text:') return;
+
+                    const rrfScore = 1 / (RRF_K + index + 1);
+                    const existing = ranked.get(key);
+                    if (existing) {
+                        existing.score += rrfScore;
+                    } else {
+                        ranked.set(key, { score: rrfScore, hit });
+                    }
+                });
+            };
+
+            const searchTasks = [];
+
+            if (query && typeof oramaSearch === 'function' && oramaDB) {
+                searchTasks.push(
+                    oramaSearch(oramaDB, { term: query, properties: ['content'], limit, tolerance: 1 })
+                        .then(results => addRankedHits(results?.hits))
+                        .catch(err => console.warn('Orama (lexical) memory search failed:', err))
+                );
+            }
+
+            if (query && isTransformerJsActive && typeof vectorSearch === 'function') {
+                searchTasks.push(
+                    vectorSearch(query, limit)
+                        .then(results => addRankedHits(results?.hits))
+                        .catch(err => console.warn('Transformer.js (semantic) memory search failed:', err))
+                );
+            }
+
+            if (searchTasks.length) {
+                await Promise.all(searchTasks);
+            }
+
+            return [...ranked.values()]
+                .sort((a, b) => b.score - a.score)
+                .slice(0, limit)
+                .map(entry => entry.hit);
+        }
+
         function scheduleBackgroundTask(task, delay = 0) {
             const runner = () => {
                 enqueueMemoryTask(async () => {
@@ -2931,16 +3047,16 @@
 
         async function indexMessageInBackground(msg, index = 0) {
             const doc = buildMemoryDocumentFromMessage(msg, index);
-            if (!doc || typeof oramaInsert !== 'function' || !oramaDB) return;
+            if (!doc || (!oramaDB && !isTransformerJsActive)) return;
             if (indexedMemoryMessageIds.has(doc.messageId)) return;
 
-            await oramaInsert(oramaDB, doc);
+            await memoryInsert(doc.content, doc);
             indexedMemoryMessageIds.add(doc.messageId);
         }
 
         function queueMessageIndex(msg, index = 0) {
             const doc = buildMemoryDocumentFromMessage(msg, index);
-            if (!doc || typeof oramaInsert !== 'function' || !oramaDB) return;
+            if (!doc || (!oramaDB && !isTransformerJsActive)) return;
             if (indexedMemoryMessageIds.has(doc.messageId)) return;
 
             scheduleBackgroundTask(async () => {
@@ -2949,15 +3065,15 @@
         }
 
         async function rebuildMemoryIndexFromChatHistory(historyMessages = null) {
-            if (typeof resetMemoryBackend !== 'function' || typeof oramaInsert !== 'function') return;
+            if (typeof resetMemoryBackend !== 'function') return;
             await resetMemoryBackend();
-            if (!oramaDB) return;
+            if (!oramaDB && !isTransformerJsActive) return;
 
             const visibleMessages = getVisibleHistoryMessages(historyMessages);
             for (let i = 0; i < visibleMessages.length; i++) {
                 const doc = buildMemoryDocumentFromMessage(visibleMessages[i], i);
                 if (!doc) continue;
-                await oramaInsert(oramaDB, doc);
+                await memoryInsert(doc.content, doc);
                 indexedMemoryMessageIds.add(doc.messageId);
             }
         }
@@ -3070,19 +3186,14 @@
             const excludedMessageIds = new Set(recentWorkingMessages.map(msg => String(msg.id || '')));
             const excludedTexts = new Set(recentWorkingMessages.map(msg => normalizeMemoryText(msg.text, 1200).toLowerCase()));
 
-            if (queryText && typeof oramaSearch === 'function' && oramaDB) {
+            if (queryText) {
                 try {
-                    const searchResults = await oramaSearch(oramaDB, {
-                        term: queryText,
-                        properties: ['content'],
-                        limit: MEMORY_RETRIEVAL_LIMIT + 8,
-                        tolerance: 1
-                    });
+                    const searchHits = await memorySearch(queryText, MEMORY_RETRIEVAL_LIMIT + 8);
 
                     const selectedMemories = [];
                     const seenIds = new Set();
 
-                    for (const hit of Array.isArray(searchResults?.hits) ? searchResults.hits : []) {
+                    for (const hit of searchHits) {
                         const memory = resolveMemoryFromSearchHit(hit, allowedMessageIds);
                         if (!memory) continue;
 
@@ -3101,7 +3212,7 @@
                         return selectedMemories;
                     }
                 } catch (err) {
-                    console.warn('Semantic memory search failed:', err);
+                    console.warn('Hybrid memory search failed:', err);
                 }
             }
 
