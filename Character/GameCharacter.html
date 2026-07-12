@@ -2,7 +2,7 @@
 <html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>Story AI - Immersive Chat</title>
     <!-- Dexie.js für unbegrenzten lokalen Speicher (IndexedDB statt localStorage).
          Falls die erste CDN-Quelle nicht erreichbar ist (Netzwerkproblem, Ad-Blocker,
@@ -1313,16 +1313,25 @@
         }
 
         @media (max-width: 1024px) {
+            /* Wichtig: Die Chat-Ansicht bleibt bewusst auf feste Viewport-Höhe
+               fixiert (wie am Desktop) statt auf "ganze Seite scrollt" umzuschalten.
+               Vorher führte height:auto hier dazu, dass die Eingabeleiste unten im
+               Dokumentfluss "versank" - bei einem langen Chatverlauf musste man
+               erst bis ganz nach unten scrollen, um überhaupt tippen zu können,
+               und die Leiste war nicht mehr am Bildschirmrand fixiert. Jetzt bleibt
+               nur der Nachrichtenverlauf (.story-log-area) selbst scrollbar, die
+               Eingabeleiste bleibt immer sichtbar am unteren Bildschirmrand.
+               100dvh statt 100vh vermeidet außerdem das bekannte "Springen" der
+               Seite, wenn mobile Browser-Adressleisten ein-/ausgeblendet werden. */
             body {
-                height: auto;
-                min-height: 100vh;
-                overflow-y: auto;
+                height: 100vh;
+                height: 100dvh;
+                overflow: hidden;
             }
 
             .chat-container {
                 flex-direction: column;
-                height: auto;
-                min-height: 100vh;
+                height: 100%;
             }
 
             .char-sidebar {
@@ -1348,7 +1357,8 @@
             }
 
             .chat-main {
-                min-height: auto;
+                min-height: 0;
+                height: 100%;
             }
 
             .chat-topbar {
@@ -1356,10 +1366,12 @@
                 height: auto;
                 flex-wrap: wrap;
                 gap: 10px;
+                flex-shrink: 0;
             }
 
             .story-log-area {
                 padding: 20px 16px;
+                min-height: 0;
             }
 
             .msg-wrapper {
@@ -1377,6 +1389,8 @@
 
             .bottom-input-pane {
                 padding: 0 12px 16px;
+                padding-bottom: max(16px, env(safe-area-inset-bottom));
+                flex-shrink: 0;
             }
 
             .input-glow-container {
@@ -1470,6 +1484,22 @@
             .persona-selector-btn {
                 font-size: 0.78rem;
                 padding: 9px 8px;
+            }
+        }
+
+        /* iOS Safari zoomt automatisch in Felder mit font-size < 16px (z.B. das
+           Chat-Eingabefeld, die Persona-/Erinnerungs-Suche und das
+           Bearbeiten-Textfeld). Auf Mobil erzwingen wir daher mindestens 16px,
+           ohne die Desktop-Optik zu verändern. Zusätzlich vergrößern wir das
+           Zahnrad/Info-Icon leicht auf ein bequemeres Touch-Ziel. */
+        @media (max-width: 768px) {
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+
+            .icon-btn {
+                width: 44px;
+                height: 44px;
             }
         }
     </style>
