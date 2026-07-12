@@ -600,9 +600,69 @@
         @media (max-width: 900px) {
             .page {
                 grid-template-columns: 1fr;
+                padding: 0 14px;
+                margin-top: 16px;
             }
             .entries-list {
                 max-height: none;
+            }
+            .panel {
+                padding: 18px;
+            }
+            .top-navbar {
+                padding: 12px 14px;
+                flex-wrap: wrap;
+                row-gap: 8px;
+            }
+            .nav-title {
+                font-size: 0.95rem;
+                min-width: 0;
+                flex: 1 1 auto;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+                order: 1;
+            }
+            .back-link {
+                order: 0;
+                padding: 8px 12px;
+                font-size: 0.85rem;
+            }
+            .nav-count-pill {
+                order: 2;
+            }
+        }
+
+        /* Zwei-spaltige Felder (z.B. Entry-Name + Keywords) sind ab hier zu eng
+           für bequeme Touch-Eingabe und stapeln sich stattdessen untereinander. */
+        @media (max-width: 600px) {
+            .row {
+                grid-template-columns: 1fr;
+            }
+            .save-row {
+                flex-wrap: wrap;
+            }
+            .save-row .btn {
+                flex: 1 1 auto;
+            }
+            .entry-form-actions .btn {
+                flex: 1 1 auto;
+            }
+        }
+
+        /* iOS Safari zoomt automatisch in Formularfelder mit font-size < 16px -
+           auf Mobil setzen wir daher 16px als Mindestgröße für alle Eingaben,
+           ohne die Desktop-Optik zu verändern. Touch-Ziele (Back-Link, Toggle-
+           Chips) werden zusätzlich etwas großzügiger. */
+        @media (max-width: 768px) {
+            input, textarea, select {
+                font-size: 16px !important;
+            }
+            .toggle-chip {
+                padding: 10px 14px;
+            }
+            .back-link {
+                min-height: 40px;
             }
         }
     </style>
