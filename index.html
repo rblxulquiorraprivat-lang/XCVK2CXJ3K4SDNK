@@ -24,6 +24,11 @@
             document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
         }
     </script>
+    <script>
+        if (typeof Dexie === 'undefined') {
+            document.write('<script src="./libs/dexie.min.js"><\/script>');
+        }
+    </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
@@ -569,6 +574,18 @@
             color: #fee2e2;
         }
 
+        .card-btn-save {
+            background: rgba(16, 185, 129, 0.12);
+            border-color: rgba(16, 185, 129, 0.25);
+            color: #6ee7b7;
+        }
+
+        .card-btn-save:hover {
+            background: rgba(16, 185, 129, 0.18);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #d1fae5;
+        }
+
         /* Icon-only variant (e.g. trash icon buttons) - stays compact instead of flex:1 */
         .card-btn-icon {
             flex: 0 0 auto;
@@ -1059,6 +1076,28 @@
         }
 
         .modal-close-btn:hover {
+            color: #fff;
+            background: rgba(255,255,255,0.08);
+            border-color: rgba(255,255,255,0.18);
+            transform: translateY(-1px);
+        }
+
+        .modal-back-btn {
+            appearance: none;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text-muted);
+            width: 36px;
+            height: 36px;
+            border-radius: 12px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .modal-back-btn:hover {
             color: #fff;
             background: rgba(255,255,255,0.08);
             border-color: rgba(255,255,255,0.18);
@@ -1649,11 +1688,135 @@
                 personality: character.personality || '',
                 secrets: character.secrets || [],
                 introductions: character.introductions ? [...character.introductions] : [],
-                characterName: character.name
+                characterName: character.name,
+                sourceCharacterId: character.id
             };
             items.push(newStory);
             await saveStoredItems(items);
             window.location.href = `Character/GameCharacter.html?id=${newStory.id}`;
+        }
+
+        let pendingExportCharacterId = null;
+
+        function getSafeDownloadName(name) {
+            const base = String(name || 'character').trim() || 'character';
+            return base
+                .replace(/[\\/:*?"<>|]+/g, '_')
+                .replace(/\s+/g, ' ')
+                .slice(0, 120);
+        }
+
+        function downloadJsonFile(filename, data) {
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function findStoriesForCharacter(character) {
+            if (!character) return [];
+            const storyTitle = `Story: ${character.name || ''}`;
+            return items.filter(item => {
+                if (!item || item.type !== 'story') return false;
+                if (item.sourceCharacterId && item.sourceCharacterId === character.id) return true;
+                if (item.characterName && item.characterName === character.name) return true;
+                if (item.name && item.name === storyTitle) return true;
+                return false;
+            });
+        }
+
+        async function getLinkedDataForItem(itemId) {
+            const [chatRow, memRow, favRow, draftRow, verRow, storyPersonaRow] = await Promise.all([
+                db.table('chatHistory').get(itemId).catch(() => null),
+                db.table('memories').get(itemId).catch(() => null),
+                db.table('favorites').get(itemId).catch(() => null),
+                db.table('drafts').get(itemId).catch(() => null),
+                db.table('displayVersions').get(itemId).catch(() => null),
+                db.table('settings').get(`storyPersona_${itemId}`).catch(() => null)
+            ]);
+
+            return {
+                chatHistory: chatRow?.history ?? null,
+                memories: memRow?.value ?? null,
+                favorites: favRow?.value ?? null,
+                draft: draftRow?.text ?? null,
+                displayVersions: verRow?.value ?? null,
+                storyPersonaId: storyPersonaRow?.value ?? null
+            };
+        }
+
+        async function exportCharacterAsJson(characterId, includeStories) {
+            const character = items.find(i => i.id === characterId && i.type === 'character');
+            if (!character) {
+                alert('Character not found.');
+                return;
+            }
+
+            const stories = includeStories ? findStoriesForCharacter(character) : [];
+            const exportStories = [];
+            for (const story of stories) {
+                const linked = await getLinkedDataForItem(story.id);
+                exportStories.push({
+                    item: story,
+                    linked
+                });
+            }
+
+            const payload = {
+                format: 'StoryAI.CharacterExport',
+                version: 1,
+                exportedAt: new Date().toISOString(),
+                character: {
+                    item: character
+                },
+                stories: exportStories
+            };
+
+            const suffix = includeStories && exportStories.length ? 'with-stories' : 'without-stories';
+            downloadJsonFile(`${getSafeDownloadName(character.name)}_${suffix}.json`, payload);
+        }
+
+        async function saveCharacterFromCard(event, characterId) {
+            if (event) event.stopPropagation();
+            const character = items.find(i => i.id === characterId && i.type === 'character');
+            if (!character) return;
+
+            const stories = findStoriesForCharacter(character);
+            if (stories.length) {
+                pendingExportCharacterId = characterId;
+                openCharacterExportChoice();
+                return;
+            }
+            await exportCharacterAsJson(characterId, false);
+        }
+
+        function openCharacterExportChoice() {
+            const backdrop = document.getElementById('characterExportBackdrop');
+            const modal = document.getElementById('characterExportModal');
+            if (!backdrop || !modal) return;
+            backdrop.style.display = 'block';
+            modal.style.display = 'block';
+        }
+
+        function closeCharacterExportChoice() {
+            pendingExportCharacterId = null;
+            const backdrop = document.getElementById('characterExportBackdrop');
+            const modal = document.getElementById('characterExportModal');
+            if (!backdrop || !modal) return;
+            backdrop.style.display = 'none';
+            modal.style.display = 'none';
+        }
+
+        async function handleCharacterExportChoice(includeStories) {
+            const id = pendingExportCharacterId;
+            closeCharacterExportChoice();
+            if (!id) return;
+            await exportCharacterAsJson(id, !!includeStories);
         }
 
         let activeId = null;
@@ -1771,6 +1934,7 @@
 
         // Wiederverwendetes Trash-Icon (ersetzt überall reinen "Delete"-Text).
         const TRASH_ICON_SVG = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
+        const DOWNLOAD_ICON_SVG = '<svg viewBox="0 0 24 24" style="width:16px;height:16px;fill:currentColor;"><path d="M5 20h14v-2H5v2zm7-18l-5.5 5.5 1.41 1.41L11 6.83V16h2V6.83l3.09 3.09 1.41-1.41L12 2z"/></svg>';
 
         function renderLibraryGrid() {
             const grid = document.getElementById('libraryGrid');
@@ -1779,6 +1943,7 @@
             const gridHTML = filteredItems.map(item => {
                 const isStory = item.type === 'story';
                 const isLorebook = item.type === 'lorebook';
+                const isCharacter = item.type === 'character';
                 const typeLabel = isStory ? `💬: ${getStoryMessageCount(item.id)}` : isLorebook ? 'Lorebook' : item.type === 'character' ? 'Character' : 'World';
                 const actionLabel = isStory ? 'Continue' : isLorebook ? 'Open' : 'Play';
                 const actionHandler = isStory
@@ -1823,6 +1988,7 @@
                                 <div class="card-actions">
                                     <button class="card-btn card-btn-play" onclick="${actionHandler}">${actionLabel}</button>
                                     <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); ${isStory ? `openItemEdit(${item.id})` : isLorebook ? `window.location.href='Lorebook/CreateLorebook.html?id=${item.id}'` : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`}">Edit</button>
+                                    ${isCharacter ? `<button class="card-btn card-btn-save card-btn-icon" onclick="saveCharacterFromCard(event, ${item.id})" title="Save">${DOWNLOAD_ICON_SVG}</button>` : ''}
                                     <button class="card-btn card-btn-delete card-btn-icon" onclick="deleteItemFromCard(event, ${item.id})" title="Delete">${TRASH_ICON_SVG}</button>
                                 </div>
                             </div>
@@ -2077,6 +2243,33 @@
         }
 
         let isCreateChoiceOpen = false;
+        let createChoiceStep = 'start';
+
+        function setCreateChoiceStep(step) {
+            createChoiceStep = step === 'type' ? 'type' : 'start';
+            const title = document.getElementById('createChoiceTitle');
+            const subtitle = document.getElementById('createChoiceSubtitle');
+            const startBody = document.getElementById('createChoiceStartBody');
+            const typeBody = document.getElementById('createChoiceTypeBody');
+            const backBtn = document.getElementById('createChoiceBackBtn');
+            if (!title || !subtitle || !startBody || !typeBody || !backBtn) return;
+
+            if (createChoiceStep === 'type') {
+                title.textContent = 'What do you want to create?';
+                subtitle.textContent = 'Choose what you want to add to your library';
+                startBody.style.display = 'none';
+                typeBody.style.display = 'grid';
+                backBtn.style.display = 'inline-flex';
+                return;
+            }
+
+            title.textContent = 'Load or Create?';
+            subtitle.textContent = 'Import a character JSON or create something new';
+            startBody.style.display = 'grid';
+            typeBody.style.display = 'none';
+            backBtn.style.display = 'none';
+        }
+
         function openCreateChoice() {
             isCreateChoiceOpen = true;
             const backdrop = document.getElementById('createChoiceBackdrop');
@@ -2084,6 +2277,7 @@
             if (!backdrop || !modal) return;
             backdrop.style.display = 'block';
             modal.style.display = 'block';
+            setCreateChoiceStep('start');
         }
 
         function closeCreateChoice() {
@@ -2093,6 +2287,108 @@
             if (!backdrop || !modal) return;
             backdrop.style.display = 'none';
             modal.style.display = 'none';
+        }
+
+        function triggerCharacterImport() {
+            const input = document.getElementById('characterImportInput');
+            if (!input) return;
+            input.value = '';
+            input.click();
+        }
+
+        function isObject(value) {
+            return value && typeof value === 'object' && !Array.isArray(value);
+        }
+
+        function normalizeImportedExport(payload) {
+            if (isObject(payload) && payload.format === 'StoryAI.CharacterExport' && payload.version === 1) {
+                return payload;
+            }
+            return null;
+        }
+
+        function allocateNonCollidingId(preferredId) {
+            const exists = items.some(i => i.id === preferredId);
+            if (!exists && typeof preferredId === 'number') return preferredId;
+            return generateNewItemId();
+        }
+
+        async function importCharacterJsonFile(file) {
+            const text = await file.text();
+            let payload;
+            try {
+                payload = JSON.parse(text);
+            } catch (err) {
+                alert('Invalid JSON file.');
+                return null;
+            }
+
+            const normalized = normalizeImportedExport(payload);
+            if (!normalized) {
+                alert('This JSON is not a StoryAI character export.');
+                return null;
+            }
+
+            const importedCharacter = normalized.character?.item;
+            if (!isObject(importedCharacter) || importedCharacter.type !== 'character') {
+                alert('Character data missing or invalid.');
+                return null;
+            }
+
+            const importedStories = Array.isArray(normalized.stories) ? normalized.stories : [];
+            const newCharacterId = allocateNonCollidingId(importedCharacter.id);
+            const characterItem = { ...importedCharacter, id: newCharacterId };
+
+            const newItems = [characterItem];
+            const storyMappings = [];
+
+            for (const entry of importedStories) {
+                const storyItem = entry?.item;
+                if (!isObject(storyItem) || storyItem.type !== 'story') continue;
+                const newStoryId = allocateNonCollidingId(storyItem.id);
+                const updatedStory = {
+                    ...storyItem,
+                    id: newStoryId,
+                    sourceCharacterId: newCharacterId
+                };
+                newItems.push(updatedStory);
+                storyMappings.push({ newId: newStoryId, linked: entry?.linked ?? null });
+            }
+
+            items.push(...newItems);
+            await saveStoredItems(items);
+
+            for (const mapping of storyMappings) {
+                const linked = mapping.linked;
+                if (!isObject(linked)) continue;
+
+                const ops = [];
+                if (Array.isArray(linked.chatHistory)) ops.push(db.table('chatHistory').put({ characterId: mapping.newId, history: linked.chatHistory }));
+                if (linked.memories !== null && linked.memories !== undefined) ops.push(db.table('memories').put({ characterId: mapping.newId, value: linked.memories }));
+                if (linked.favorites !== null && linked.favorites !== undefined) ops.push(db.table('favorites').put({ characterId: mapping.newId, value: linked.favorites }));
+                if (typeof linked.draft === 'string') ops.push(db.table('drafts').put({ characterId: mapping.newId, text: linked.draft }));
+                if (linked.displayVersions !== null && linked.displayVersions !== undefined) ops.push(db.table('displayVersions').put({ characterId: mapping.newId, value: linked.displayVersions }));
+                if (linked.storyPersonaId !== null && linked.storyPersonaId !== undefined) ops.push(db.table('settings').put({ id: `storyPersona_${mapping.newId}`, value: linked.storyPersonaId }));
+                if (ops.length) await Promise.all(ops);
+            }
+
+            await refreshChatMessageCounts();
+            return newCharacterId;
+        }
+
+        async function handleCharacterImportFile(event) {
+            const file = event?.target?.files?.[0];
+            if (!file) return;
+            closeCreateChoice();
+            const newId = await importCharacterJsonFile(file);
+            if (!newId) return;
+            activeId = newId;
+            isSettingsActive = false;
+            isPersonaActive = false;
+            isEditActive = false;
+            editingItemId = null;
+            renderApp();
+            alert('Character imported.');
         }
 
         function handleCreateChoice(type) {
@@ -2436,17 +2732,47 @@
                     <div class="create-choice-modal" id="createChoiceModal" style="display: none;" role="dialog" aria-modal="true">
                         <div class="create-choice-modal__header">
                             <div>
-                                <div class="create-choice-modal__title">What do you want to create?</div>
-                                <div class="create-choice-modal__subtitle">Choose what you want to add to your library</div>
+                                <div class="create-choice-modal__title" id="createChoiceTitle">Load or Create?</div>
+                                <div class="create-choice-modal__subtitle" id="createChoiceSubtitle">Import a character JSON or create something new</div>
                             </div>
-                            <button type="button" class="modal-close-btn" onclick="closeCreateChoice()" title="Close">
+                            <div style="display:flex; gap: 10px;">
+                                <button type="button" class="modal-back-btn" id="createChoiceBackBtn" onclick="setCreateChoiceStep('start')" title="Back" style="display:none;">
+                                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg>
+                                </button>
+                                <button type="button" class="modal-close-btn" onclick="closeCreateChoice()" title="Close">
+                                    <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="create-choice-modal__body">
+                            <div id="createChoiceStartBody" style="display: grid; gap: 10px;">
+                                <button type="button" class="create-choice-option" onclick="setCreateChoiceStep('type')">Create <span>Make something new</span></button>
+                                <button type="button" class="create-choice-option" onclick="triggerCharacterImport()">Load .json <span>Import a character</span></button>
+                            </div>
+                            <div id="createChoiceTypeBody" style="display: none; gap: 10px;">
+                                <button type="button" class="create-choice-option" onclick="handleCreateChoice('character')">Character <span>Chat character</span></button>
+                                <button type="button" class="create-choice-option" onclick="handleCreateChoice('world')">World <span>Setting / place</span></button>
+                                <button type="button" class="create-choice-option" onclick="handleCreateChoice('lorebook')">Lorebook <span>Knowledge base</span></button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <input type="file" id="characterImportInput" accept=".json,application/json" style="display:none" onchange="handleCharacterImportFile(event)">
+
+                    <div class="create-choice-backdrop" id="characterExportBackdrop" style="display: none;" onclick="closeCharacterExportChoice()"></div>
+                    <div class="create-choice-modal" id="characterExportModal" style="display: none;" role="dialog" aria-modal="true">
+                        <div class="create-choice-modal__header">
+                            <div>
+                                <div class="create-choice-modal__title">Save the character with stories or without?</div>
+                                <div class="create-choice-modal__subtitle">This character has stories in your library.</div>
+                            </div>
+                            <button type="button" class="modal-close-btn" onclick="closeCharacterExportChoice()" title="Close">
                                 <svg viewBox="0 0 24 24" style="width:18px; height:18px; fill:currentColor;"><path d="M18.3 5.71 12 12l6.3 6.29-1.41 1.42L10.59 13.4 4.29 19.7 2.88 18.29 9.17 12 2.88 5.71 4.29 4.3l6.3 6.29 6.3-6.29z"/></svg>
                             </button>
                         </div>
                         <div class="create-choice-modal__body">
-                            <button type="button" class="create-choice-option" onclick="handleCreateChoice('character')">Character <span>Chat character</span></button>
-                            <button type="button" class="create-choice-option" onclick="handleCreateChoice('world')">World <span>Setting / place</span></button>
-                            <button type="button" class="create-choice-option" onclick="handleCreateChoice('lorebook')">Lorebook <span>Knowledge base</span></button>
+                            <button type="button" class="create-choice-option" onclick="handleCharacterExportChoice(true)">Save the character along with all stories.<span>Includes story chat/memory data</span></button>
+                            <button type="button" class="create-choice-option" onclick="handleCharacterExportChoice(false)">Save the character without stories.<span>Character only</span></button>
                         </div>
                     </div>
                 `;
