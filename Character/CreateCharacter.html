@@ -54,6 +54,27 @@
             overflow-x: hidden;
         }
 
+        body,
+        .creator-form-panel,
+        .creator-preview-panel,
+        .secrets-list-display,
+        textarea,
+        .form-control {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        body::-webkit-scrollbar,
+        .creator-form-panel::-webkit-scrollbar,
+        .creator-preview-panel::-webkit-scrollbar,
+        .secrets-list-display::-webkit-scrollbar,
+        textarea::-webkit-scrollbar,
+        .form-control::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
+        }
+
         /* ---TOP NAVIGATION BAR --- */
         .top-navbar {
             background-color: var(--bg-sidebar);
@@ -1054,6 +1075,7 @@
         let currentIntroductions = [];
         let editId = null;
         let isEditing = false;
+        let currentItemType = 'character';
 
         function getQueryParam(name) {
             const params = new URLSearchParams(window.location.search);
@@ -1368,6 +1390,7 @@
         function populateForm(item) {
             editId = item.id;
             isEditing = true;
+            currentItemType = item.type || 'character';
             document.getElementById('charStoryName').value = item.name || item.storyName || '';
             document.getElementById('charShortDesc').value = item.shortDesc || item.subtitle || '';
             document.getElementById('charAppearance').value = item.appearance || '';
@@ -1692,7 +1715,7 @@
 
             const fullCharacterEntity = {
                 id: editId || generateNewItemId(savedItems),
-                type: 'character',
+                type: currentItemType,
                 name: document.getElementById('charStoryName').value,
                 storyName: document.getElementById('charStoryName').value,
                 characterName: document.getElementById('charStoryName').value,
@@ -1728,13 +1751,15 @@
             }
 
             console.log("Database Object Payload compiled:", fullCharacterEntity);
-            alert(`🎉 Success! Character "${fullCharacterEntity.storyName}" was successfully ${isEditing ? 'updated' : 'created'}.\n\nRedirect you back to the Dashboard Hub...`);
+            const entityLabel = fullCharacterEntity.type === 'world' ? 'World' : 'Character';
+            alert(`🎉 Success! ${entityLabel} "${fullCharacterEntity.storyName}" was successfully ${isEditing ? 'updated' : 'created'}.\n\nRedirect you back to the Dashboard Hub...`);
             window.location.href = '../index.html';
         }
 
         async function initializeForm() {
             const editParam = getQueryParam('id');
             if (!editParam) {
+                currentItemType = (getQueryParam('type') === 'world') ? 'world' : 'character';
                 currentTags = ['Otaku', 'Comedy'];
                 currentSecrets = [];
                 currentIntroductions = [];
@@ -1747,6 +1772,7 @@
 
             const editIdValue = parseInt(editParam, 10);
             if (Number.isNaN(editIdValue)) {
+                currentItemType = (getQueryParam('type') === 'world') ? 'world' : 'character';
                 currentTags = ['Otaku', 'Comedy'];
                 currentSecrets = [];
                 currentIntroductions = [];
@@ -1762,6 +1788,7 @@
             if (storedItem) {
                 populateForm(storedItem);
             } else {
+                currentItemType = (getQueryParam('type') === 'world') ? 'world' : 'character';
                 currentTags = ['Otaku', 'Comedy'];
                 currentSecrets = [];
                 currentIntroductions = [];
