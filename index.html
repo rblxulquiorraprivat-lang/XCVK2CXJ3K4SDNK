@@ -328,6 +328,17 @@
             justify-content: flex-end;
         }
 
+        /* Unsichtbarer Vollbild-Layer hinter dem Create-Menü. Fängt Klicks/Taps ab,
+           die visuell noch über dem geöffneten Menü liegen (z.B. auf Handys über den
+           Filter-Tabs), damit sie NUR das Menü schließen und nicht gleichzeitig das
+           Element darunter (z.B. einen Filter-Tab) auslösen. */
+        .create-menu-backdrop {
+            position: fixed;
+            inset: 0;
+            z-index: 2100;
+            background: transparent;
+        }
+
         .create-menu {
             position: absolute;
             top: calc(100% + 10px);
@@ -2035,7 +2046,7 @@
                         : item.type === currentFilter;
                 const matchesSearch = item.name.toLowerCase().includes(searchQuery) || item.description.toLowerCase().includes(searchQuery);
                 return matchesFilter && matchesSearch;
-            }).sort((a, b) => a.name.localeCompare(b.name));
+            }).sort((a, b) => (b.id || 0) - (a.id || 0));
         }
 
         function renderFilterTabs() {
@@ -2166,6 +2177,12 @@
         }
 
         function openSettings() {
+            // Toggle-Verhalten wie bei "Your Library": ist Settings bereits aktiv,
+            // schließt ein erneuter Klick den Bereich, statt ihn neu zu öffnen.
+            if (isSettingsActive) {
+                goBackToLibrary();
+                return;
+            }
             activeId = null;
             isPersonaActive = false;
             isSettingsActive = true;
@@ -2173,6 +2190,11 @@
         }
 
         function openPersona() {
+            // Gleiches Toggle-Verhalten für Personas.
+            if (isPersonaActive) {
+                goBackToLibrary();
+                return;
+            }
             activeId = null;
             isSettingsActive = false;
             isPersonaActive = true;
@@ -2420,6 +2442,8 @@
             if (!menu) return;
             menu.style.display = isCreateMenuOpen ? 'grid' : 'none';
             menu.innerHTML = createMenuContentHTML();
+            const backdrop = document.getElementById('createMenuBackdrop');
+            if (backdrop) backdrop.style.display = isCreateMenuOpen ? 'block' : 'none';
         }
 
         function openCreateChoice(event) {
@@ -2870,7 +2894,7 @@
                     return matchesFilter && matchesSearch;
                 });
 
-                filteredItems.sort((a, b) => a.name.localeCompare(b.name));
+                filteredItems.sort((a, b) => (b.id || 0) - (a.id || 0));
 
                 // Hinweis: Das eigentliche Karten-Markup wird zentral in renderLibraryGrid()
                 // erzeugt und weiter unten per renderLibraryGrid() in #libraryGrid gerendert.
@@ -2893,6 +2917,7 @@
                                 <input id="searchInput" type="text" placeholder="Search library..." value="${searchQuery}" onkeyup="handleSearch(event)">
                             </div>
                             <div class="create-menu-wrapper" id="createMenuWrapper">
+                                <div class="create-menu-backdrop" id="createMenuBackdrop" style="display: ${isCreateMenuOpen ? 'block' : 'none'};" onclick="closeCreateChoice()"></div>
                                 <button class="create-btn" onclick="openCreateChoice(event)">+ Create</button>
                                 <div class="create-menu" id="createMenu" style="display: ${isCreateMenuOpen ? 'grid' : 'none'};">${createMenuContentHTML()}</div>
                             </div>
