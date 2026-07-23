@@ -5,28 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Dashboard</title>
     <!-- Dexie.js für unbegrenzten lokalen Speicher (IndexedDB statt localStorage).
-         Falls die erste CDN-Quelle nicht erreichbar ist (Netzwerkproblem, Ad-Blocker,
-         Firewall o.ä.), wird automatisch auf alternative CDNs ausgewichen, damit die
-         App auch dann funktioniert. -->
-    <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
+         Verwende IMMER die lokale Version aus ./libs/, um document.write() und
+         CDN-Abhängigkeiten zu vermeiden. Das ist zuverlässiger und schneller. -->
+    <script src="./libs/dexie.min.js"></script>
     <script>
         if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://unpkg.com/dexie@3.4.2/dist/dexie.min.js"><\/script>');
-        }
-    </script>
-    <script>
-        if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.4.2/dexie.min.js"><\/script>');
-        }
-    </script>
-    <script>
-        if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
-        }
-    </script>
-    <script>
-        if (typeof Dexie === 'undefined') {
-            document.write('<script src="./libs/dexie.min.js"><\/script>');
+            // Fallback: Falls lokale Version auch nicht geladen wurde, versuche CDN
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js';
+            script.onload = () => {};
+            script.onerror = () => {
+                console.error('Dexie konnte nicht geladen werden! App wird nicht funktionieren.');
+                alert('⚠️ Dexie.js konnte nicht geladen werden. Bitte prüfe deine Internetverbindung.');
+            };
+            document.head.appendChild(script);
         }
     </script>
     <style>
@@ -1323,6 +1315,29 @@
             drafts: 'characterId',
             displayVersions: 'characterId'
         });
+        db.version(2).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId',
+            memoryState: 'characterId'
+        });
+        db.version(3).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId',
+            memoryState: 'characterId',
+            worlds: '++id'
+        });
 
         // --- Persistenter Speicher -----------------------------------------
         // Bittet den Browser, den Ursprung als "persistent" einzustufen, damit
@@ -1717,6 +1732,44 @@
             }
         }
 
+        async function syncStoredWorldsFromScenarios() {
+            let scenarios;
+            try {
+                scenarios = JSON.parse(localStorage.getItem('storyki_scenarios') || '[]');
+            } catch (err) {
+                console.warn('Error reading stored worlds:', err);
+                return;
+            }
+            if (!Array.isArray(scenarios) || !scenarios.length) return;
+
+            const storedItems = await loadStoredItems();
+            const itemsById = new Map(storedItems.map(item => [item.id, item]));
+            scenarios.forEach(scenario => {
+                if (!scenario?.id || !scenario.name) return;
+                const data = scenario.data && typeof scenario.data === 'object' ? scenario.data : {};
+                const worldSettings = data.settings && typeof data.settings === 'object' ? data.settings : {};
+                const existing = itemsById.get(scenario.id) || {};
+                const backgroundURL = worldSettings.backgroundUrl || existing.backgroundURL || '';
+                itemsById.set(scenario.id, {
+                    ...existing,
+                    id: scenario.id,
+                    type: 'world',
+                    name: scenario.name,
+                    description: existing.description || 'A saved world with story cards.',
+                    avatar: backgroundURL,
+                    backgroundURL,
+                    cards: Array.isArray(data.cards) ? data.cards : [],
+                    worldData: data,
+                    tags: Array.isArray(existing.tags) ? existing.tags : [],
+                    color: existing.color || '#4ea8de',
+                    lastPlayed: scenario.updatedAt || scenario.createdAt || Date.now(),
+                    favorite: existing.favorite || false
+                });
+            });
+
+            await saveStoredItems(Array.from(itemsById.values()));
+        }
+
         // Nachrichten-Zähler werden einmal beim Laden aus der chatHistory-Tabelle
         // vorberechnet, damit renderLibraryGrid() weiterhin synchron bleiben kann.
         let chatMessageCounts = {};
@@ -1758,7 +1811,10 @@
         // gelöschten) alten Chatverlauf landete.
         let __lastGeneratedItemId = 0;
         function generateNewItemId() {
-            const highestExisting = items.reduce((maxId, item) => Math.max(maxId, item.id || 0), 0);
+            const numericIds = items
+                .map(item => item && item.id)
+                .filter(id => typeof id === 'number' && Number.isSafeInteger(id) && id >= 0);
+            const highestExisting = numericIds.reduce((maxId, id) => Math.max(maxId, id), 0);
             const candidate = Math.max(Date.now(), highestExisting + 1, __lastGeneratedItemId + 1);
             __lastGeneratedItemId = candidate;
             return candidate;
@@ -1957,6 +2013,9 @@
         async function initApp() {
             // Zuerst evtl. vorhandene alte localStorage-Daten nach Dexie übernehmen
             await migrateLegacyLocalStorage();
+            // Worlds created in CreateWorld.html are kept in the legacy scenario
+            // store and are mirrored into the library used by this page.
+            await syncStoredWorldsFromScenarios();
 
             // Settings, Personas & ausgewählte Persona aus der DB laden
             const storedSettings = await loadStoredSettings();
@@ -2027,7 +2086,7 @@
                 .slice(0, 8);
 
             container.innerHTML = recentItems.length ? recentItems.map(item => `
-                <div class="recent-item" onclick="openDetail(${item.id})">
+                <div class="recent-item" onclick='openDetail(${JSON.stringify(item.id)})'>
                     <div class="recent-avatar" style="background-image: url('${item.avatar}')"></div>
                     <div class="recent-info">
                         <div class="recent-name">${item.name}</div>
@@ -2090,13 +2149,16 @@
                 const isStory = item.type === 'story';
                 const isLorebook = item.type === 'lorebook';
                 const isCharacter = item.type === 'character';
+                const idArg = JSON.stringify(item.id);
+                const idParam = encodeURIComponent(String(item.id));
                 const typeLabel = isStory ? `💬: ${getStoryMessageCount(item.id)}` : isLorebook ? 'Lorebook' : item.type === 'character' ? 'Character' : 'World';
                 const actionLabel = isStory ? 'Continue' : isLorebook ? 'Open' : 'Play';
-                const actionHandler = isStory
-                    ? `event.stopPropagation(); window.location.href='Character/GameCharacter.html?id=${item.id}'`
+                const actionHandler = `event.stopPropagation(); playItem(${idArg})`;
+                const editHandler = (isStory || isCharacter)
+                    ? `event.stopPropagation(); window.location.href="Character/CreateCharacter.html?id=${idParam}"`
                     : isLorebook
-                        ? `event.stopPropagation(); window.location.href='Lorebook/CreateLorebook.html?id=${item.id}'`
-                        : `event.stopPropagation(); createStoryFromCharacter(${item.id})`;
+                        ? `event.stopPropagation(); window.location.href="Lorebook/CreateLorebook.html?id=${idParam}"`
+                        : `event.stopPropagation(); openWorldEditor(${idArg})`;
                 const entryCount = Array.isArray(item.entries) ? item.entries.length : 0;
                 // Lorebooks besitzen kein Cover-Bild - statt eines leeren/kaputten
                 // background-image bekommen sie eine ruhige Buch-Optik in ihrer
@@ -2115,9 +2177,9 @@
                         </div>`
                     : `<div class="card-cover" style="background-image: url('${item.avatar}')"></div>`;
                 return `
-                    <div class="lib-card animate-in" onclick="openDetail(${item.id})">
+                    <div class="lib-card animate-in" onclick='openDetail(${idArg})'>
                         <div class="card-badge">${typeLabel}</div>
-                        <button class="card-favorite-btn ${item.favorite ? 'is-favorite' : ''}" onclick="toggleFavorite(event, ${item.id})" title="Favorite">
+                        <button class="card-favorite-btn ${item.favorite ? 'is-favorite' : ''}" onclick='toggleFavorite(event, ${idArg})' title="Favorite">
                             <svg viewBox="0 0 24 24" style="width: 16px; height: 16px; fill: currentColor;">
                                 <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21 12 17.27z"/>
                             </svg>
@@ -2130,10 +2192,11 @@
                             <div class="card-desc">${item.description}</div>
                             <div class="card-footer">
                                 <div class="card-actions">
-                                    <button class="card-btn card-btn-play" onclick="${actionHandler}">${actionLabel}</button>
-                                    <button class="card-btn card-btn-edit" onclick="event.stopPropagation(); ${isStory ? `openItemEdit(${item.id})` : isLorebook ? `window.location.href='Lorebook/CreateLorebook.html?id=${item.id}'` : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`}">Edit</button>
-                                    ${isCharacter ? `<button class="card-btn card-btn-save card-btn-icon" onclick="saveCharacterFromCard(event, ${item.id})" title="Save">${DOWNLOAD_ICON_SVG}</button>` : ''}
-                                    <button class="card-btn card-btn-delete card-btn-icon" onclick="deleteItemFromCard(event, ${item.id})" title="Delete">${TRASH_ICON_SVG}</button>
+                                    <button class="card-btn card-btn-play" onclick='${actionHandler}'>${actionLabel}</button>
+                                    <button class="card-btn card-btn-edit" onclick='${editHandler}'>Edit</button>
+                                    ${isStory ? `<button class="card-btn card-btn-edit" onclick='event.stopPropagation(); duplicateItem(${idArg})'>Duplicate</button>` : ''}
+                                    ${isCharacter ? `<button class="card-btn card-btn-save card-btn-icon" onclick='saveCharacterFromCard(event, ${idArg})' title="Save">${DOWNLOAD_ICON_SVG}</button>` : ''}
+                                    <button class="card-btn card-btn-delete card-btn-icon" onclick='deleteItemFromCard(event, ${idArg})' title="Delete">${TRASH_ICON_SVG}</button>
                                 </div>
                             </div>
                         </div>
@@ -2342,15 +2405,50 @@
         async function duplicateItem(id) {
             const item = items.find(i => i.id === id);
             if (!item) return;
+            const sourceId = item.id;
+            const newId = generateNewItemId();
             const newItem = {
                 ...item,
-                id: generateNewItemId(),
+                id: newId,
                 name: `Copy of ${item.name}`,
                 lastPlayed: Date.now(),
                 favorite: false
             };
             items.unshift(newItem);
             await saveStoredItems(items);
+            try {
+                const storyPersonaRow = await db.table('settings').get(`storyPersona_${sourceId}`).catch(() => null);
+                const ops = [];
+
+                const chatRow = await db.table('chatHistory').get(sourceId).catch(() => null);
+                if (chatRow && Array.isArray(chatRow.history)) {
+                    ops.push(db.table('chatHistory').put({ characterId: newId, history: chatRow.history }));
+                }
+
+                const memRow = await db.table('memories').get(sourceId).catch(() => null);
+                if (memRow && memRow.value !== undefined) ops.push(db.table('memories').put({ characterId: newId, value: memRow.value }));
+
+                const favRow = await db.table('favorites').get(sourceId).catch(() => null);
+                if (favRow && favRow.value !== undefined) ops.push(db.table('favorites').put({ characterId: newId, value: favRow.value }));
+
+                const draftRow = await db.table('drafts').get(sourceId).catch(() => null);
+                if (draftRow && typeof draftRow.text === 'string') ops.push(db.table('drafts').put({ characterId: newId, text: draftRow.text }));
+
+                const verRow = await db.table('displayVersions').get(sourceId).catch(() => null);
+                if (verRow && verRow.value !== undefined) ops.push(db.table('displayVersions').put({ characterId: newId, value: verRow.value }));
+
+                const memoryStateRow = await db.table('memoryState').get(sourceId).catch(() => null);
+                if (memoryStateRow && memoryStateRow.value !== undefined) ops.push(db.table('memoryState').put({ characterId: newId, value: memoryStateRow.value }));
+
+                if (storyPersonaRow && storyPersonaRow.value !== undefined) {
+                    ops.push(db.table('settings').put({ id: `storyPersona_${newId}`, value: storyPersonaRow.value }));
+                }
+
+                if (ops.length) await Promise.all(ops);
+            } catch (err) {
+                console.warn('Error duplicating linked data:', err);
+            }
+            await refreshChatMessageCounts();
             renderApp();
         }
 
@@ -2407,6 +2505,8 @@
                 window.location.href = `Character/GameCharacter.html?id=${id}`;
             } else if (item.type === 'lorebook') {
                 window.location.href = `Lorebook/CreateLorebook.html?id=${id}`;
+            } else if (item.type === 'world') {
+                window.location.href = `World/CharacterWorld.html?worldId=${id}`;
             } else {
                 createStoryFromCharacter(id);
             }
@@ -2594,12 +2694,19 @@
                 return;
             }
             if (chosen === 'world') {
-                window.location.href = 'Character/CreateCharacter.html?type=world';
+                window.location.href = 'World/CreateWorld.html';
                 return;
             }
             if (chosen === 'lorebook') {
                 window.location.href = 'Lorebook/CreateLorebook.html';
             }
+        }
+
+        function openWorldEditor(worldId) {
+            const world = items.find(item => item.id === worldId && item.type === 'world');
+            if (!world) return;
+            sessionStorage.setItem('storyki_selected_world_id', String(world.id));
+            window.location.href = 'World/CreateWorld.html';
         }
 
         /* Favoriten umschalten */
@@ -2664,9 +2771,9 @@
                                     </div>
                                     <div style="display:flex; gap: 10px; margin-top: 20px; flex-wrap: wrap;">
                                         <button type="submit" class="create-btn" style="flex:1; min-width: 120px;">Save</button>
-                                        <button type="button" class="card-btn card-btn-play" style="flex:1; min-width: 120px;" onclick="playItem(${item.id})">${actionLabel}</button>
-                                        <button type="button" class="card-btn card-btn-edit" style="flex:1; min-width: 120px;" onclick="duplicateItem(${item.id})">Duplicate</button>
-                                        <button type="button" class="card-btn card-btn-delete card-btn-icon" style="flex: 0 0 auto; min-width: 44px;" onclick="deleteItem(${item.id})" title="Delete">${TRASH_ICON_SVG}</button>
+                                        <button type="button" class="card-btn card-btn-play" style="flex:1; min-width: 120px;" onclick='playItem(${JSON.stringify(item.id)})'>${actionLabel}</button>
+                                        <button type="button" class="card-btn card-btn-edit" style="flex:1; min-width: 120px;" onclick='duplicateItem(${JSON.stringify(item.id)})'>Duplicate</button>
+                                        <button type="button" class="card-btn card-btn-delete card-btn-icon" style="flex: 0 0 auto; min-width: 44px;" onclick='deleteItem(${JSON.stringify(item.id)})' title="Delete">${TRASH_ICON_SVG}</button>
                                     </div>
                                 </form>
                             </div>
@@ -2940,11 +3047,13 @@
                 const isCharacterDetail = item.type === 'character';
                 const isLorebookDetail = item.type === 'lorebook';
                 const isStoryDetail = item.type === 'story';
-                const editHandlerDetail = isStoryDetail
-                    ? `openItemEdit(${item.id})`
+                const idArgDetail = JSON.stringify(item.id);
+                const idParamDetail = encodeURIComponent(String(item.id));
+                const editHandlerDetail = (isStoryDetail || isCharacterDetail)
+                    ? `window.location.href="Character/CreateCharacter.html?id=${idParamDetail}"`
                     : isLorebookDetail
-                        ? `window.location.href='Lorebook/CreateLorebook.html?id=${item.id}'`
-                        : `window.location.href='Character/CreateCharacter.html?id=${item.id}'`;
+                        ? `window.location.href="Lorebook/CreateLorebook.html?id=${idParamDetail}"`
+                        : `openWorldEditor(${idArgDetail})`;
 
                 main.innerHTML = `
                     <div class="animate-in">
@@ -2968,13 +3077,14 @@
                             </div>
                             
                             <div>
-                                <button class="action-btn-large" style="background-color: ${item.color}; box-shadow: 0 4px 20px ${item.color}44;" onclick="playItem(${item.id})">
+                                <button class="action-btn-large" style="background-color: ${item.color}; box-shadow: 0 4px 20px ${item.color}44;" onclick='playItem(${idArgDetail})'>
                                     ${btnText}
                                 </button>
                                 <div class="detail-actions-row">
-                                    <button class="card-btn card-btn-edit" onclick="${editHandlerDetail}">Edit</button>
-                                    ${isCharacterDetail ? `<button class="card-btn card-btn-save card-btn-icon" onclick="saveCharacterFromCard(event, ${item.id})" title="Save">${DOWNLOAD_ICON_SVG}</button>` : ''}
-                                    <button class="card-btn card-btn-delete card-btn-icon" onclick="deleteItemFromDetail(event, ${item.id})" title="Delete">${TRASH_ICON_SVG}</button>
+                                    <button class="card-btn card-btn-edit" onclick='${editHandlerDetail}'>Edit</button>
+                                    ${isStoryDetail ? `<button class="card-btn card-btn-edit" onclick='duplicateItem(${idArgDetail})'>Duplicate</button>` : ''}
+                                    ${isCharacterDetail ? `<button class="card-btn card-btn-save card-btn-icon" onclick='saveCharacterFromCard(event, ${idArgDetail})' title="Save">${DOWNLOAD_ICON_SVG}</button>` : ''}
+                                    <button class="card-btn card-btn-delete card-btn-icon" onclick='deleteItemFromDetail(event, ${idArgDetail})' title="Delete">${TRASH_ICON_SVG}</button>
                                 </div>
                             </div>
                         </div>
