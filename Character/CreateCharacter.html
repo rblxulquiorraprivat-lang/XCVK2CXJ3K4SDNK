@@ -4,26 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Story AI - Create Character</title>
-    <!-- Dexie.js für unbegrenzten lokalen Speicher (IndexedDB statt localStorage).
-         Falls die erste CDN-Quelle nicht erreichbar ist (Netzwerkproblem, Ad-Blocker,
-         Firewall o.ä.), wird automatisch auf alternative CDNs ausgewichen, damit die
-         App auch dann funktioniert. -->
-    <script src="https://cdn.jsdelivr.net/npm/dexie@3.4.2/dist/dexie.min.js"></script>
-    <script>
-        if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://unpkg.com/dexie@3.4.2/dist/dexie.min.js"><\/script>');
-        }
-    </script>
-    <script>
-        if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/3.4.2/dexie.min.js"><\/script>');
-        }
-    </script>
-    <script>
-        if (typeof Dexie === 'undefined') {
-            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/dexie/4.4.4/dexie.min.js"><\/script>');
-        }
-    </script>
+    <!-- Dexie.js für unbegrenzten lokalen Speicher (IndexedDB statt localStorage). -->
+    <script src="../libs/dexie.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -470,7 +452,7 @@
             background-position: center;
             border: 2px solid rgba(255,255,255,0.15);
             box-shadow: 0 8px 20px rgba(0,0,0,0.4);
-            background-image: url('https://images.unsplash.com/photo-1578632767115-351597cf2477?w=400&auto=format&fit=crop&q=80');
+            background-image: url('https://i.pinimg.com/1200x/65/f4/d9/65f4d91a400d893d02d1151c4616bba5.jpg');
         }
 
         .live-body {
@@ -1467,6 +1449,17 @@
             drafts: 'characterId',
             displayVersions: 'characterId'
         });
+        db.version(2).stores({
+            characters: 'id, name',
+            chatHistory: 'characterId',
+            personas: 'id, name',
+            memories: 'characterId',
+            favorites: 'characterId',
+            settings: 'id',
+            drafts: 'characterId',
+            displayVersions: 'characterId',
+            memoryState: 'characterId'
+        });
 
         // --- Persistenter Speicher -----------------------------------------
         // Bittet den Browser, den Ursprung als "persistent" einzustufen, damit
@@ -1671,7 +1664,10 @@
         // ein zuvor gelöschtes Item bekommt (siehe ausführlichen Kommentar dort).
         let __lastGeneratedItemId = 0;
         function generateNewItemId(existingItems) {
-            const highestExisting = (existingItems || []).reduce((maxId, item) => Math.max(maxId, item.id || 0), 0);
+            const numericIds = (existingItems || [])
+                .map(item => item && item.id)
+                .filter(id => typeof id === 'number' && Number.isSafeInteger(id) && id >= 0);
+            const highestExisting = numericIds.reduce((maxId, id) => Math.max(maxId, id), 0);
             const candidate = Math.max(Date.now(), highestExisting + 1, __lastGeneratedItemId + 1);
             __lastGeneratedItemId = candidate;
             return candidate;
@@ -1713,7 +1709,9 @@
                 rate: parseFloat(document.getElementById('charVoiceRate').value) || 1
             };
 
+            const existingItem = isEditing ? (savedItems.find(item => item.id === editId) || null) : null;
             const fullCharacterEntity = {
+                ...(existingItem || {}),
                 id: editId || generateNewItemId(savedItems),
                 type: currentItemType,
                 name: document.getElementById('charStoryName').value,
@@ -1738,9 +1736,9 @@
                 secrets: currentSecrets,
                 tags: currentTags,
                 voiceSettings,
-                lastPlayed: Date.now(),
-                engine: 'StoryAI Creator',
-                favorite: false,
+                lastPlayed: existingItem?.lastPlayed ?? Date.now(),
+                engine: existingItem?.engine || 'StoryAI Creator',
+                favorite: existingItem?.favorite ?? false,
                 isUserCreated: true
             };
 
